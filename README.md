@@ -100,7 +100,7 @@ node src/cli.js --nickname 闪电 --personality sharp --flaw frail \
                 --points "intelligence:5,mood:1,math:2" --legacy 3
 node src/cli.js --difficulty custom --custom "gain:1.5,forgetScale:0.5,points:18,lopsided:1"
 
-# 志愿填报与热更新（v2.6）
+# 志愿填报、热更新与推送（v2.6 / v2.7）
 node src/cli.js --auto --volunteers "3 7 2 1 5 9"   # 指定志愿（编号见对局里打印的志愿表）
 node src/cli.js --auto --no-volunteers             # 跳过志愿填报，直接按分数录取（做对照用）
 node src/cli.js --content                          # 打印当前内容包状态
@@ -630,21 +630,23 @@ run_class:    { grade: [1], note: '班干部竞选只在高一' },
 │   ├── build-desktop.mjs # 免 electron-builder 出 Windows 便携版（复用 Electron 运行时 + 压缩）
 │   └── build-installer.mjs  # 用 NSIS 编译 Windows 安装包（开始菜单 / 卸载 / 静默安装）
 └── test/
-    ├── engine.test.js    # 33 个引擎测试（选科 / 两段制 / 构筑 / NPC / 商店 / 存档 / 平衡）
-    ├── cast.test.js      # 27 个随机姓名 / 阵容 / 关系树 / 剧情线 / 占位符防漏测试
-    ├── calendar.test.js  # 12 个校历测试（时间表完整性 + 具体事实：高三不会捡高二学姐的钱包）
-    ├── server.test.js    # 14 个接口测试（真实起服务，含 /src/** 静态资源与前端渲染联通）
+    ├── engine.test.js    # 34 个引擎测试（选科 / 两段制 / 构筑 / NPC / 商店 / 存档 / 平衡）
+    ├── cast.test.js      # 35 个随机姓名 / 阵容 / 关系树 / 剧情线 / 占位符防漏测试
+    ├── calendar.test.js  # 16 个校历测试（时间表完整性 + 具体事实：高三不会捡高二学姐的钱包）
+    ├── server.test.js    # 16 个接口测试（真实起服务，含 /src/** 静态资源与前端渲染联通）
     ├── web.test.js       # 17 个前端检查（资源 / id / 接口 / 渲染 / CSS 合法性 / 布局约束 / 模块图）
     ├── electron.test.js  # 19 个桌面客户端测试（内嵌服务 / 菜单 / 窗口状态 / 安全配置 / 便携版与安装包）
-    ├── android.test.js   # 15 个安卓测试（离线接口 / 工程契约 / 模块图 / 全面屏 / APK 可运行性）
-    └── custom.test.js    # 30 个「自定义人物」测试（属性点 / 性格 / 缺陷 / 自定义关系人物 /
-                          #   自定义难度 / 传承点 / 模板 / 存档兼容 / 新结局分支可达性）
-    ├── content.test.js   # 52 个内容包测试（校验 / 合并 / 校验和 / 打包脚本 / 两个真实包可玩性）
-    └── volunteer.test.js # 28 个 v2.6 测试（志愿全流程 / 存档往返 / 自动填表 / 特殊路线 /
-                          #   毕业去向 / 因果链 / 内容包在引擎侧的原地改写与回滚）
+    ├── android.test.js   # 16 个安卓测试（离线接口 / 工程契约 / 模块图 / 全面屏 / APK 可运行性）
+    ├── custom.test.js    # 30 个「自定义人物」测试（属性点 / 性格 / 缺陷 / 自定义关系人物 /
+    │                     #   自定义难度 / 传承点 / 模板 / 存档兼容 / 新结局分支可达性）
+    ├── content.test.js   # 59 个内容包测试（校验 / 合并 / 校验和 / 打包脚本 / 两个真实包可玩性）
+    ├── volunteer.test.js # 28 个 v2.6 测试（志愿全流程 / 存档往返 / 自动填表 / 特殊路线 /
+    │                     #   毕业去向 / 因果链 / 内容包在引擎侧的原地改写与回滚）
+    └── update.test.js    # 21 个 v2.7 推送测试（清单校验 / 决策矩阵 / 地址护栏 / 端到端"拉清单→装包→已是最新" /
+                          #   离线模式 / 示例清单与包的防漂移守门）
 ```
 
-一共 **263 个测试**，`npm test` 全部通过（成品包的布局检查在没有产物时会自动跳过）。
+一共 **291 个测试**，`npm test` 全部通过（成品包的布局检查在没有产物时会自动跳过）。
 其中最有用的一个是 `android.test.js` 的最后一条：它把打好的 APK **解包**，
 直接 import 里面那份 `local-api.js` 打一局（含高考后的志愿填报）—— 只要 APK 少打包了任何一个模块，
 测试就会红，而不是等用户装到手机上看到白屏。
@@ -691,7 +693,7 @@ index.html?demo=6&preset=olympiad&nickname=闪电&flaw=frail&points=intelligence
 
 | 产物 | 命令 | 大小 | 用途 |
 | --- | --- | --- | --- |
-| `dist/马鞍山二中模拟器-2.6.0-debug.apk` | `npm run apk` | 0.42 MB | 安卓侧载包（含热更新入口） |
+| `dist/马鞍山二中模拟器-2.7.0-debug.apk` | `npm run apk` | 0.46 MB | 安卓侧载包（含热更新 + 推送入口） |
 | `dist/desktop/…-安装版.exe` | `npm run installer` | 78 MB | Windows：双击安装，带向导/快捷方式/卸载 |
 | `dist/desktop/…-win-x64.zip` | `npm run desktop:portable` | 110 MB | Windows：免安装绿色版，解压即玩 |
 
@@ -785,7 +787,7 @@ v2.1 的存档里没有人物阵容和剧情记录，读进来会按种子把同
   代词用 `${cast.deskmate.ta}`，**不要写死"张昊""王老师"**——那些名字每局都不一样
   （而且玩家可以自己给同桌起名，写死了就会串戏）。
   `week` 是"第几周之后才能触发"，一条线里要保持递增。
-- **调平衡之外别忘的两件事**：`node --test test/`（263 个测试，包含剧情结构、姓名生成、
+- **调平衡之外别忘的两件事**：`node --test test/`（291 个测试，包含剧情结构、姓名生成、
   自制人物、内容包与事件日历的守门测试）和 `node tools/preview-relations.mjs` + `python tools/svg-preview.py`
   （不用开浏览器就能看关系树排版）。
 - **不知道该做什么的时候**：翻 [ROADMAP.md](./ROADMAP.md)，那里按 P0/P1/P2 排了短期 / 中期 / 长期建议，
