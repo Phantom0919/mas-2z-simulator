@@ -33,6 +33,7 @@ import {
   emptyPack,
   mergeById,
   normalizePack,
+  parsePackText,
   planPack,
   satisfies,
   stableStringify,
@@ -41,6 +42,7 @@ import {
 } from '../src/content.js';
 
 const TOOL = fileURLToPath(new URL('../tools/build-content-pack.mjs', import.meta.url));
+const CLI = fileURLToPath(new URL('../src/cli.js', import.meta.url));
 const readJson = (url) => JSON.parse(readFileSync(url, 'utf8'));
 const officialPack = readJson(new URL('../web/content/official-pack.json', import.meta.url));
 const demoPack = readJson(new URL('../web/content/demo-update.json', import.meta.url));
@@ -746,6 +748,80 @@ test('两个示例包都不含未定义字段 / 空字符串正文（手写 JSON
       }
     }
   }
+});
+
+/* =============================================== parsePackText（玩家手写的包） */
+
+test('parsePackText：剥掉 UTF-8 BOM 与零宽字符（记事本 / PowerShell 存的文件）', () => {
+  const pack = { format: 1, meta: { name: '带 BOM 的包' }, items: [] };
+  assert.deepEqual(parsePackText(`\uFEFF${JSON.stringify(pack)}`), pack);
+  // 从网页 / 聊天软件复制来的文本常常混进零宽字符和 NBSP
+  assert.deepEqual(parsePackText(`\u200B\u00A0  ${JSON.stringify(pack)}`), pack);
+});
+
+test('parsePackText：收下对象、忽略首尾空白，内部代码可以统一走这个入口', () => {
+  const pack = { format: 1 };
+  assert.equal(parsePackText(pack), pack);
+  assert.deepEqual(parsePackText('\n\t {"format":1}  \n'), { format: 1 });
+});
+
+test('parsePackText：报错要点名真正的原因，而不是 JSON.parse 的天书', () => {
+  assert.throws(() => parsePackText(''), /内容包是空的/);
+  assert.throws(() => parsePackText('   \uFEFF  '), /内容包是空的/);
+  assert.throws(() => parsePackText('[]'), /必须以 \{ 开头/);
+  assert.throws(() => parsePackText('[{"id":"a"}]'), /数组放进 events/);
+  assert.throws(() => parsePackText('{"meta":{"name":"中文引号“}}'), /中文标点/);
+  assert.throws(() => parsePackText('{"items":[],}'), /末尾多了一个逗号/);
+  assert.throws(() => parsePackText('{ // 注释\n "format":1}'), /不支持/);
+  assert.throws(() => parsePackText(42), /JSON 文本或一个 JSON 对象/);
+});
+
+test('parsePackText：顶层不是对象时直接说清楚，不把噪音丢给 validatePack', () => {
+  assert.throws(() => parsePackText('"just a string"'), /必须以 \{ 开头/);
+  assert.throws(() => parsePackText('null'), /必须以 \{ 开头/);
+});
+
+test('CLI：--pack 能读带 BOM 的包，并且 --content 报的是"加载之后"的状态', () => {
+  /*
+   * 两个回归：
+   *   1. 玩家用记事本存的内容包带 BOM，以前会报 `Unexpected token ''` 直接装不上；
+   *   2. `--content` 原来排在 `--pack` 加载之前 return，`--pack x --content`
+   *      永远显示"官方内置内容"——玩家自查热更新的第一条命令就是它。
+   */
+  const file = tmpFile('bom-pack.json');
+  writeFileSync(file, `\uFEFF${JSON.stringify(officialPack)}`, 'utf8');
+  const run = spawnSync(process.execPath, [CLI, '--pack', file, '--content'], { encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /已加载内容包：官方焕新内容包/, run.stdout);
+  assert.doesNotMatch(run.stdout, /当前：官方内置内容/, '加载后的状态不能被"内置内容"盖住');
+  const counts = /随机事件：(\d+) 个（内置 (\d+) 个）/.exec(run.stdout);
+  assert.ok(counts, `状态里要有事件计数：${run.stdout}`);
+  assert.ok(Number(counts[1]) > Number(counts[2]), '内容包的事件要真的进了随机池');
+  assert.equal(run.stdout.includes('读内容包失败'), false);
+});
+
+test('CLI：--pack 指向坏包时只说人话，而且不静默算成功', () => {
+  const file = tmpFile('broken-pack.json');
+  writeFileSync(file, '{"items":[],}', 'utf8');
+  const run = spawnSync(process.execPath, [CLI, '--pack', file, '--content'], { encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stderr, /末尾多了一个逗号/);
+  assert.match(run.stdout, /当前：官方内置内容/, '坏包不该让状态变成"已加载"');
+});
+
+test('引擎：applyContentPack 也接受原始 JSON 文本（CLI / 服务端 / 离线三条入口共用一条解析路径）', async () => {
+  const engine = await import('../src/engine.js');
+  const before = engine.contentStatus().eventCount;
+  const result = engine.applyContentPack(`\uFEFF${JSON.stringify(officialPack)}`);
+  assert.equal(result.ok, true, result.errors.join('；'));
+  assert.ok(engine.contentStatus().eventCount > before, '事件要真的追加进引擎');
+  engine.resetContent();
+  assert.equal(engine.contentStatus().active, false);
+
+  const bad = engine.applyContentPack('{"items":[],}');
+  assert.equal(bad.ok, false, '读不懂的文本不能算成功');
+  assert.match(bad.errors[0], /末尾多了一个逗号/);
+  assert.equal(engine.contentStatus().active, false, '坏包不能把引擎留在半应用状态');
 });
 
 /* ============================================ tools/build-content-pack.mjs */

@@ -30,6 +30,7 @@ import {
   viewState,
 } from '../src/engine.js';
 import { BACKGROUNDS, GOALS, TRAITS, TRACKS } from '../src/data/character.js';
+import { parsePackText } from '../src/content.js';
 import { DEFAULT_WEEKS_PER_SEMESTER, ELECTIVE_KEYS, ELECTIVE_PICK, SUBJECT_MAP } from '../src/data/school.js';
 
 /**
@@ -174,9 +175,9 @@ export function createLocalApi() {
           pack = body.pack;
         } else if (typeof body.text === 'string') {
           try {
-            pack = JSON.parse(body.text);
-          } catch {
-            throw new GameError('这段内容不是合法的 JSON，检查一下是不是漏了引号或逗号。');
+            pack = parsePackText(body.text);
+          } catch (error) {
+            throw new GameError(error?.message ?? '这段内容不是合法的 JSON，检查一下是不是漏了引号或逗号。');
           }
         } else if (typeof body.url === 'string') {
           const target = body.url.trim();
@@ -190,9 +191,9 @@ export function createLocalApi() {
             throw new GameError(`拉取失败：${error?.message ?? '网络不可用'}`);
           }
           try {
-            pack = JSON.parse(text);
-          } catch {
-            throw new GameError('这个地址返回的不是 JSON。');
+            pack = parsePackText(text);
+          } catch (error) {
+            throw new GameError(`这个地址返回的内容包读不懂：${error?.message ?? '不是 JSON'}`);
           }
           source = 'url';
         } else {

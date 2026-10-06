@@ -884,6 +884,20 @@ ${SCHOOL.name} 模拟器 · 终端版 v2
 }
 
 async function main() {
+  // 启动时先打内容包（热更新）：--pack <文件> 指定，默认读 saves/content-pack.json。
+  // 必须排在 --content / --gallery 之前，否则 `--pack x --content` 会打印"加载前"的状态，
+  // 让人误以为包没生效（这正是用户自查热更新的第一条命令）。
+  if (argv.pack !== undefined) {
+    try {
+      const file = typeof argv.pack === 'string' ? argv.pack : 'saves/content-pack.json';
+      const result = applyContentPack(readFileSync(file, 'utf8'));
+      if (result.ok) console.log(green(`  🔄 已加载内容包：${result.summary.name}（${result.summary.total} 项）`));
+      else console.error(red(`  内容包没生效：${result.errors.join('；')}`));
+    } catch (error) {
+      console.error(red(`  读内容包失败：${error.message}`));
+    }
+  }
+
   if (argv.gallery) {
     renderGallery(endingCatalog(), loadProfile(profileFile));
     return;
@@ -922,18 +936,6 @@ async function main() {
     // 高考之后要不要填志愿（v2.6 的新终局玩法）；--no-volunteers 可以关掉
     volunteers: !argv.noVolunteers,
   };
-
-  // 启动时先打内容包（热更新）：--pack <文件> 指定，默认读 saves/content-pack.json
-  if (argv.pack !== undefined) {
-    try {
-      const file = typeof argv.pack === 'string' ? argv.pack : 'saves/content-pack.json';
-      const result = applyContentPack(JSON.parse(readFileSync(file, 'utf8')));
-      if (result.ok) console.log(green(`  🔄 已加载内容包：${result.summary.name}（${result.summary.total} 项）`));
-      else console.error(red(`  内容包没生效：${result.errors.join('；')}`));
-    } catch (error) {
-      console.error(red(`  读内容包失败：${error.message}`));
-    }
-  }
 
   let game;
   const wantsWizard = Boolean(argv.wizard) || (!argv.auto && !argv.json && process.stdin.isTTY && !argv.yes);

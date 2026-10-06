@@ -38,6 +38,7 @@ import {
   submitVolunteers,
   viewState,
 } from './engine.js';
+import { parsePackText } from './content.js';
 import { BACKGROUNDS, GOALS, TRAITS, TRACKS } from './data/character.js';
 import { DIFFICULTY } from './engine.js';
 import { DEFAULT_WEEKS_PER_SEMESTER, ELECTIVE_KEYS, ELECTIVE_PICK, SUBJECT_MAP } from './data/school.js';
@@ -61,7 +62,7 @@ async function clearActivePack() {
 /** 读取落盘的内容包（启动时用）。 */
 export async function loadSavedPack() {
   try {
-    return JSON.parse(await readFile(PACK_FILE, 'utf8'));
+    return parsePackText(await readFile(PACK_FILE, 'utf8'));
   } catch {
     return null;
   }
@@ -71,7 +72,9 @@ export async function loadSavedPack() {
 export async function applyPackAtBoot(file = null) {
   let pack = null;
   if (file) {
-    pack = JSON.parse(await readFile(file, 'utf8'));
+    // 显式指定的包读不懂就直接抛：不能像默认路径那样静默回退到内置内容，
+    // 否则 `--pack 写错的.json` 会看起来"启动成功但内容没变"。
+    pack = parsePackText(await readFile(file, 'utf8'));
   } else {
     pack = await loadSavedPack();
   }
@@ -394,9 +397,9 @@ export function createGameServer({
         }
         if (!pack && text) {
           try {
-            pack = JSON.parse(String(text));
+            pack = parsePackText(String(text));
           } catch (error) {
-            sendJson(res, 400, { error: `内容包不是合法的 JSON：${error.message}` });
+            sendJson(res, 400, { error: error.message });
             return;
           }
         }
@@ -519,8 +522,15 @@ if (isMain) {
   const args = parseArgs(process.argv.slice(2));
   const port = Number(args.port ?? process.env.PORT ?? 3210);
   const host = String(args.host ?? '127.0.0.1');
-  // 启动时先把内容包打上：热更新过的东西重启之后还在
-  const packed = await applyPackAtBoot(args.pack ? String(args.pack) : null);
+  // 启动时先把内容包打上：热更新过的东西重启之后还在。
+  // `--pack` 指定的文件读不懂时只报一行、然后照常起服务（用内置内容），
+  // 不要因为一个内容包把整个网页版拦在门外。
+  let packed = null;
+  try {
+    packed = await applyPackAtBoot(args.pack ? String(args.pack) : null);
+  } catch (error) {
+    console.error(`⚠️ 内容包没有加载（改用内置内容继续启动）：${error.message}`);
+  }
   if (packed?.ok) console.log(`🔄 已加载内容包：${packed.summary.name}${packed.summary.version ? ` v${packed.summary.version}` : ''}（${packed.summary.total} 项）`);
   const server = createGameServer();
   server.listen(port, host, () => {

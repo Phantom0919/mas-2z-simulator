@@ -90,6 +90,7 @@ import {
   PACK_FORMAT,
   checksumPack,
   normalizePack,
+  parsePackText,
   planPack,
   summarizePack,
   validatePack,
@@ -197,11 +198,24 @@ function packContext() {
 /**
  * 应用一个内容包（热更新）。**原地改写**引擎里的内容，不重启、不重装。
  *
- * @param {object} pack 内容包（JSON 解析后的对象）
+ * 既接受解析好的对象，也接受**原始 JSON 文本**（顺带剥 BOM、识别中文标点 /
+ * 尾逗号 / 注释这些 Windows 上最常见的坑，见 parsePackText）。
+ * 文本读不懂时返回 `{ ok: false }` 而不是抛异常，让 CLI / 服务端 / 离线网页
+ * 三条路径都能用同样的方式报错。
+ *
+ * @param {object|string} pack 内容包（对象或 JSON 文本）
  * @returns {{ ok: boolean, errors: string[], warnings: string[], summary: object|null, checksum: string|null }}
  */
 export function applyContentPack(pack) {
-  const data = normalizePack(pack);
+  let input = pack;
+  if (typeof input === 'string') {
+    try {
+      input = parsePackText(input);
+    } catch (error) {
+      return { ok: false, errors: [error.message], warnings: [], summary: null, checksum: null };
+    }
+  }
+  const data = normalizePack(input);
   const check = validatePack(data, packContext());
   if (!check.ok) {
     return { ok: false, errors: check.errors, warnings: check.warnings, summary: null, checksum: null };

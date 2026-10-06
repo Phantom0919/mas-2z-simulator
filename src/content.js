@@ -203,6 +203,57 @@ function sections() {
   };
 }
 
+/* ----------------------------------------------------------------- 解析 */
+
+/**
+ * 解析一段内容包文本（玩家从本地文件 / 粘贴框 / https 地址拿到的原始字符串）。
+ *
+ * 这一步专门对付"看起来完全没错、就是装不上"的四种情况，因为它们全都发生在玩家
+ * **第一次自己写包**的那五分钟里，而原生 `JSON.parse` 的报错对玩家毫无意义：
+ *   1. **UTF-8 BOM**：Windows 记事本"另存为 UTF-8"、PowerShell `Set-Content -Encoding utf8`
+ *      都会在开头塞一个 U+FEFF，`JSON.parse` 会报 `Unexpected token ''`——先剥掉。
+ *      顺带剥掉零宽字符和 NBSP（从网页/聊天软件复制的文本里常见）。
+ *   2. **中文标点**：`“ ”` `，` `：` —— 报错时直接点名。
+ *   3. **尾随逗号** / `//` 注释：JSON 不允许，报错时点名。
+ *   4. **空文本 / 顶层不是对象**：直接说清楚，而不是让 validatePack 报一串"缺 id"。
+ *
+ * 文本无法修复时一律抛 Error（调用方翻译成界面文案或 400）；
+ * 传进来的已经是对象就原样返回，方便内部代码统一走这个入口。
+ *
+ * @param {unknown} input
+ * @returns {object}
+ */
+export function parsePackText(input) {
+  if (!(typeof input === 'string')) {
+    if (isPlainObject(input)) return input;
+    throw new Error('内容包应该是一段 JSON 文本或一个 JSON 对象。');
+  }
+  // BOM / 零宽字符 / NBSP / 首尾空白：这些"看不见的字符"是 Windows 上最常见的第一道坎
+  const text = input.replace(/^[\uFEFF\u200B\u00A0\s]+/, '').replace(/[\uFEFF\u200B]+$/, '').trim();
+  if (!text) throw new Error('内容包是空的：没有读到任何 JSON 文本。');
+  if (text[0] !== '{') {
+    const head = text.slice(0, 12).replace(/\s+/g, ' ');
+    const more = text[0] === '[' ? '（顶层得是对象，把数组放进 events / items 这些字段里）' : '';
+    throw new Error(`内容包必须以 { 开头，现在开头是 "${head}"${more}。`);
+  }
+
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (error) {
+    const hint = /[\u201C\u201D\u2018\u2019\uFF0C\uFF1A\uFF1B]/.test(text)
+      ? '（里面出现了中文标点 “ ” ‘ ’ ，：；——JSON 只认半角 " 和 , 和 :）'
+      : /,\s*[}\]]/.test(text)
+        ? '（末尾多了一个逗号？JSON 最后一项后面不能跟 ,）'
+        : /(^|\s)\/\/|\/\*/.test(text)
+          ? '（JSON 不支持 // 或 /* */ 注释，删掉即可）'
+          : '（常见原因：少一个逗号 / 多一个引号 / 用了单引号 / 括号没配对）';
+    throw new Error(`内容包不是合法的 JSON：${error.message}${hint}`);
+  }
+  if (!isPlainObject(data)) throw new Error('内容包的顶层必须是一个 JSON 对象（用 { } 包起来）。');
+  return data;
+}
+
 /* -------------------------------------------------------------- normalize */
 
 /**
