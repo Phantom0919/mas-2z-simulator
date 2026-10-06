@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色校园风，去掉标题栏，状态栏/导航栏跟游戏背景同色 -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF0D1117</item>
+        <item name="android:colorPrimary">#FF3FB950</item>
+        <item name="android:colorAccent">#FF2F81F7</item>
+        <item name="android:statusBarColor">#FF0D1117</item>
+        <item name="android:navigationBarColor">#FF0D1117</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <!--
+          刘海屏 / 挖孔屏：允许内容画到挖孔区域（API 28+ 生效，低版本自动忽略）。
+          网页那边用 viewport-fit=cover + env(safe-area-inset-*) 保证内容不被挡住。
+        -->
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <!-- 导航栏不做对比度蒙层，保持纯深色 -->
+        <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+    </style>
+</resources>

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+out/
+.android-sdk/
+android/debug.keystore
+*.log
+saves/
+.DS_Store
+# 界面验收截图（本机产物，随时可重新生成）
+shots/
+# Python 工具的字节码缓存
+__pycache__/
+*.pyc

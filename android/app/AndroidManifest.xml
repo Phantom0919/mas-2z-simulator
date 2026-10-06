@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  马鞍山二中模拟器 · Android 客户端
+
+  页面通过 https://mas2z.local/ 这个虚拟域名加载，由 MainActivity 用
+  shouldInterceptRequest 从 assets 里直接读文件返回。
+  这样做的好处：ES 模块（import/export）在 file:// 下会被 CORS 拦掉，
+  换成 https 同源虚拟域名就完全正常，而且不需要 androidx.webkit。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.mas2z.simulator"
+    android:versionCode="20600"
+    android:versionName="2.6.0">
+
+    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
+
+    <!--
+      热更新需要联网：玩家可以在「内容包」面板里填一个地址，从网上下载新内容（新事件 / 平衡调整），
+      不用重新装 APK。不填地址就完全离线，这个权限不会被动用。
+      usesCleartextTraffic 保持关闭（targetSdk 34 默认就是 false），只允许 https。
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
+      声明支持各种屏幕：小屏手机、大屏手机、平板、以及任意像素密度。
+      anyDensity=true 让系统按真实密度渲染，配合网页里的 viewport meta 自适应。
+    -->
+    <supports-screens
+        android:anyDensity="true"
+        android:smallScreens="true"
+        android:normalScreens="true"
+        android:largeScreens="true"
+        android:xlargeScreens="true" />
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:theme="@style/AppTheme"
+        android:hardwareAccelerated="true"
+        android:allowBackup="true"
+        android:supportsRtl="false"
+        android:resizeableActivity="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden|uiMode|fontScale"
+            android:screenOrientation="fullUser"
+            android:windowSoftInputMode="adjustResize"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -1,0 +1,112 @@
+{
+  "name": "mas-2z-simulator",
+  "productName": "马鞍山二中模拟器",
+  "version": "2.6.0",
+  "description": "马鞍山二中模拟器 —— 零依赖的 Node.js 高中生活模拟器（CLI + 网页 + Electron 桌面客户端 + 安卓 APK）",
+  "type": "module",
+  "private": true,
+  "main": "electron/main.cjs",
+  "bin": {
+    "mas2z": "./src/cli.js"
+  },
+  "exports": {
+    ".": "./src/engine.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "cli": "node src/cli.js",
+    "web": "node src/server.js",
+    "test": "node --test test/",
+    "sim": "node tools/sim.js",
+    "gallery": "node src/cli.js --gallery",
+    "play": "node src/cli.js --auto --strategy diligent",
+    "desktop": "electron .",
+    "desktop:dev": "electron . --dev",
+    "desktop:selftest": "electron . --selftest",
+    "desktop:portable": "node tools/build-desktop.mjs",
+    "installer": "node tools/build-installer.mjs",
+    "apk:sdk": "node tools/android-sdk.mjs",
+    "apk": "node tools/build-apk.mjs",
+    "icons": "python tools/make-icon.py",
+    "dist": "electron-builder --win --x64",
+    "dist:dir": "electron-builder --dir"
+  },
+  "keywords": [
+    "simulator",
+    "game",
+    "nodejs",
+    "cli",
+    "electron",
+    "desktop",
+    "roguelite",
+    "maanshan",
+    "马鞍山二中"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "author": {
+    "name": "马鞍山二中模拟器",
+    "email": "noreply@example.com"
+  },
+  "build": {
+    "appId": "com.mas2z.simulator",
+    "productName": "马鞍山二中模拟器",
+    "copyright": "MIT Licensed · 虚构作品，与任何真实学校无关",
+    "directories": {
+      "output": "dist/desktop",
+      "buildResources": "electron/assets"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "web/**/*",
+      "package.json",
+      "README.md"
+    ],
+    "win": {
+      "icon": "electron/assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "马鞍山二中模拟器-${version}-安装版.${ext}",
+      "shortcutName": "马鞍山二中模拟器"
+    },
+    "portable": {
+      "artifactName": "马鞍山二中模拟器-${version}-便携版.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Game"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.games"
+    }
+  },
+  "license": "MIT"
+}

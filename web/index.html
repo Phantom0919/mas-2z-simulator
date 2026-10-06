@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <!-- viewport-fit=cover：刘海屏/挖孔屏上让页面铺满，配合 CSS 的 env(safe-area-inset-*) 让内容不被挡住 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0d1117" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <!--
+      connect-src 从 'self' 放宽成 'self' https:，唯一原因是「🔄 内容包」面板允许玩家
+      自己填一个 https 地址去拉内容包 JSON（浏览器直接 fetch，或交给服务端拉）。
+      别的都没放松：脚本、样式、图片、字体、base、form 一律还是 self / none，
+      页面本身不会去网上拉任何东西。
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>马鞍山二中模拟器</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <!--
+      ---------- 开屏动画 ----------
+      纯 CSS 动画，没有任何脚本：整层在 ~1.75s 后自动淡出，
+      动画的最终关键帧是 visibility: hidden，配合 animation-fill-mode: forwards
+      自动把这一层收掉，不会挡住底下的点击。
+      aria-hidden + inert 让读屏软件跳过它；prefers-reduced-motion 下直接隐藏（见 style.css）。
+    -->
+    <div class="splash" id="splash" aria-hidden="true">
+      <div class="splash-inner">
+        <svg class="splash-mark" viewBox="0 0 132 132" role="img" aria-label="校徽">
+          <defs>
+            <linearGradient id="splash-mark-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#4fd463" />
+              <stop offset="1" stop-color="#2f81f7" />
+            </linearGradient>
+          </defs>
+          <circle class="splash-ring" cx="66" cy="66" r="58" />
+          <circle class="splash-ring-inner" cx="66" cy="66" r="49" />
+          <path class="splash-spark" d="M66 4 l3.6 7.3 -3.6 7.3 -3.6 -7.3 z" />
+          <text class="splash-gl" x="66" y="83">贰中</text>
+        </svg>
+        <h2 class="splash-title">马鞍山二中模拟器</h2>
+        <p class="splash-subtitle">厚德 · 励学 · 敦行</p>
+        <p class="splash-tagline">三年 · 六个学期 · 七十二次选择</p>
+      </div>
+    </div>
+
+    <!-- ---------- 顶栏 ---------- -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-logo">🏫</span>
+        <div>
+          <h1>马鞍山二中模拟器</h1>
+          <p id="motto">厚德 · 励学 · 敦行</p>
+        </div>
+      </div>
+      <div class="topbar-info" id="topbar-info"></div>
+      <span class="mode-badge" id="mode-badge" hidden></span>
+      <div class="topbar-actions">
+        <button id="btn-relations" class="ghost" title="这一届的人都跟你什么关系">🌳 关系图</button>
+        <button id="btn-story" class="ghost" title="七条剧情线，看看演到哪了">📜 故事线</button>
+        <button id="btn-shop" class="ghost" title="零花钱怎么花">🛒 商店</button>
+        <button id="btn-gallery" class="ghost" title="跨局收集的结局图鉴">📖 图鉴</button>
+        <button id="btn-content" class="ghost" title="导入内容包：加事件、加道具、调平衡，不用重装">🔄 内容包</button>
+        <button id="btn-save" class="ghost" title="导出存档文件">💾 导出</button>
+        <button id="btn-load" class="ghost" title="导入存档文件">📂 导入</button>
+        <button id="btn-new" class="primary">🔄 新的一局</button>
+        <input type="file" id="file-input" accept="application/json,.json" hidden />
+      </div>
+    </header>
+
+    <!-- ---------- 三栏主体 ---------- -->
+    <main class="layout" id="layout" hidden>
+      <section class="panel panel-status">
+        <h2>我的状态</h2>
+        <div id="stats"></div>
+        <h2>科目掌握</h2>
+        <div id="subjects"></div>
+        <h2>开局构筑</h2>
+        <div id="build"></div>
+        <h2>人际关系</h2>
+        <div id="npc"></div>
+        <h2>我的物品</h2>
+        <div id="items"></div>
+      </section>
+
+      <section class="panel panel-actions">
+        <div class="panel-head">
+          <h2>这一周做什么</h2>
+          <span class="hint" id="action-hint"></span>
+        </div>
+        <div class="phase-banner" id="phase-badge"></div>
+        <div class="action-tabs" id="action-tabs"></div>
+        <div id="actions" class="actions"></div>
+      </section>
+
+      <section class="panel panel-log">
+        <div class="panel-head">
+          <h2>校园日志</h2>
+          <span class="hint">最近 60 条</span>
+        </div>
+        <div id="log" class="log"></div>
+        <h2>成绩单</h2>
+        <div id="exams" class="exams"></div>
+      </section>
+    </main>
+
+    <!-- ---------- 开局构筑：自定义人物 ---------- -->
+    <div class="overlay" id="start-screen">
+      <div class="card start-card">
+        <h2>开学第一天</h2>
+        <p class="muted">
+          先把"这个人"捏出来：姓名、外号、头像、性格、天赋、短板，还有能自由分配的开局属性点。
+          三年后的结局，从这一页就开始写了。
+        </p>
+
+        <div class="creator-toolbar">
+          <button type="button" id="btn-random-all" class="ghost" title="随机生成一整个人">🎲 随机捏一个</button>
+          <button type="button" id="btn-reset-creator" class="ghost" title="全部恢复默认">↺ 全默认</button>
+          <button type="button" id="btn-open-cards" class="ghost" title="保存 / 读取自己的角色卡">🗂️ 角色卡（<span id="card-count">0</span>）</button>
+          <button type="button" id="btn-start-gallery" class="ghost" title="跨局收集的结局图鉴">📖 结局图鉴</button>
+        </div>
+
+        <h3 class="build-title">角色模板（一键填好，之后照样可以改）</h3>
+        <div class="pick-grid preset-grid" id="preset-options"></div>
+
+        <details class="creator-block" open>
+          <summary>① 这个人是谁</summary>
+          <div class="form-grid">
+            <label>姓名 <span class="name-row"><input id="input-name" maxlength="12" placeholder="留空则随机" /><button type="button" id="btn-random-name" class="ghost" title="随机一个中文常见名字">🎲</button></span></label>
+            <label>性别 <select id="input-gender"><option value="男">男</option><option value="女">女</option></select></label>
+            <label>外号 <span class="name-row"><input id="input-nickname" maxlength="12" placeholder="留空则随机" /><button type="button" id="btn-random-nickname" class="ghost" title="随机一个外号">🎲</button></span></label>
+          </div>
+          <p class="creator-note muted small">头像（纯装饰，会出现在日志和关系图里）：</p>
+          <div class="avatar-grid" id="avatar-options"></div>
+        </details>
+
+        <details class="creator-block" open>
+          <summary>② 性格（选 1）与天赋（选 2）</summary>
+          <p class="creator-note muted small">性格决定"这个人是什么脾气"，可以带负面；天赋是能力。</p>
+          <div class="pick-grid" id="personality-options"></div>
+          <h3 class="build-title">天赋（十一选二）<span class="muted small" id="trait-count"></span></h3>
+          <div class="pick-grid" id="trait-options"></div>
+        </details>
+
+        <details class="creator-block">
+          <summary>③ 缺陷（可选 0~1 个，用短板换属性点）</summary>
+          <p class="creator-note muted small">认下一个短板，就能多拿 4~6 点属性点。想要高上限，先接受低起点。</p>
+          <div class="pick-grid" id="flaw-options"></div>
+        </details>
+
+        <details class="creator-block" open>
+          <summary>④ 属性点</summary>
+          <p class="creator-note muted small" id="point-budget"></p>
+          <div class="point-bar"><i id="point-fill" class="point-fill"></i></div>
+          <div id="point-attrs"></div>
+          <h3 class="build-title">单科底子（每点 +4 分，每科最多 3 点）</h3>
+          <div class="point-subjects" id="point-subjects"></div>
+        </details>
+
+        <details class="creator-block" open>
+          <summary>⑤ 选科与目标</summary>
+          <h3 class="build-title">首选科目（二选一）</h3>
+          <div class="pick-grid" id="track-options"></div>
+          <h3 class="build-title">再选科目（四选二）</h3>
+          <div class="pick-grid" id="elective-options"></div>
+          <h3 class="build-title">家庭背景（四选一）</h3>
+          <div class="pick-grid" id="background-options"></div>
+          <h3 class="build-title">高考目标（九选一）</h3>
+          <div class="pick-grid" id="goal-options"></div>
+        </details>
+
+        <details class="creator-block">
+          <summary>⑥ 自定义关系人物（可不填）</summary>
+          <p class="creator-note muted small">同桌、死党、老对手、心动对象——名字和性别都可以自己定，不填就随机。</p>
+          <div id="cast-roles"></div>
+        </details>
+
+        <details class="creator-block" open>
+          <summary>⑦ 难度与节奏</summary>
+          <div class="form-grid">
+            <label>难度 <select id="input-difficulty"></select><span id="difficulty-hint" class="muted small difficulty-hint"></span></label>
+            <label>每学期周数 <input id="input-weeks" type="number" min="3" max="20" value="6" /></label>
+            <label>随机种子 <input id="input-seed" placeholder="留空则用当前时间" /></label>
+          </div>
+          <div id="custom-knobs" class="custom-knobs" hidden></div>
+          <label class="switch-row">
+            <input type="checkbox" id="input-endless" />
+            自由模式：高三下学期不自动高考，什么时候上考场你说了算
+          </label>
+        </details>
+
+        <p class="build-hint" id="build-hint"></p>
+
+        <div class="start-actions">
+          <button id="btn-start" class="primary big">开始三年</button>
+          <button id="btn-save-card" class="ghost big">💾 存成角色卡</button>
+          <button id="btn-continue" class="ghost big" hidden>继续上次的存档</button>
+        </div>
+        <p class="muted small">
+          本模拟器中的事件、人物、分数线和结局均为虚构，仅供娱乐，与任何真实学校或机构无关。
+        </p>
+      </div>
+    </div>
+
+    <!-- ---------- 角色卡（本地保存的自定义人物） ---------- -->
+    <div class="overlay hidden" id="cards-modal">
+      <div class="card wide-card">
+        <div class="event-title">🗂️ 我的角色卡</div>
+        <p class="muted">角色卡存在这台设备的浏览器里（清理浏览器数据会一起清掉），换设备请用导出存档。</p>
+        <div class="form-grid">
+          <label>新角色卡名字 <input id="input-card-name" maxlength="16" placeholder="例如：我的卷王开局" /></label>
+        </div>
+        <div class="start-actions">
+          <button id="btn-card-save" class="primary">💾 把当前配置存成角色卡</button>
+        </div>
+        <div class="card-list" id="cards-body"></div>
+        <div class="start-actions">
+          <button id="btn-cards-close" class="ghost">关闭</button>
+          <button id="btn-cards-clear" class="ghost">清空角色卡</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 事件 ---------- -->
+    <div class="overlay hidden" id="event-modal">
+      <div class="card event-card">
+        <div class="event-title" id="event-title"></div>
+        <p class="event-text" id="event-text"></p>
+        <div class="event-choices" id="event-choices"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 选科 ---------- -->
+    <div class="overlay hidden" id="subject-modal">
+      <div class="card event-card">
+        <div class="event-title" id="subject-title">选择科目</div>
+        <p class="muted">这个行动需要指定一个科目：</p>
+        <div class="event-choices" id="subject-choices"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 人物关系树状图 ---------- -->
+    <div class="overlay hidden" id="relations-modal">
+      <div class="card wide-card">
+        <div class="event-title">🌳 人物关系图</div>
+        <p class="muted" id="relations-summary"></p>
+        <div class="tree-wrap" id="relations-canvas"></div>
+        <h3 class="build-title">这一届的人</h3>
+        <div class="cast-grid" id="relations-list"></div>
+        <div class="start-actions">
+          <button id="btn-relations-close" class="ghost">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 故事线 ---------- -->
+    <div class="overlay hidden" id="story-modal">
+      <div class="card wide-card">
+        <div class="event-title">📜 故事线</div>
+        <p class="muted" id="story-progress"></p>
+        <div class="story-body" id="story-body"></div>
+        <div class="start-actions">
+          <button id="btn-story-close" class="ghost">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 商店 ---------- -->
+    <div class="overlay hidden" id="shop-modal">
+      <div class="card wide-card">
+        <div class="event-title">🛒 校门口的小卖部</div>
+        <p class="muted" id="shop-money"></p>
+        <div class="shop-grid" id="shop-body"></div>
+        <div class="start-actions">
+          <button id="btn-shop-close" class="ghost">继续上学</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 图鉴 ---------- -->
+    <div class="overlay hidden" id="gallery-modal">
+      <div class="card wide-card">
+        <div class="event-title">📖 结局图鉴</div>
+        <p class="muted" id="gallery-progress"></p>
+        <div class="gallery-grid" id="gallery-body"></div>
+        <div id="gallery-runs"></div>
+        <div class="start-actions">
+          <button id="btn-gallery-close" class="ghost">关闭</button>
+          <button id="btn-gallery-reset" class="ghost">清空收集</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 内容包（热更新入口） ---------- -->
+    <div class="overlay hidden" id="content-modal">
+      <div class="card wide-card">
+        <div class="event-title">🔄 内容包</div>
+        <p class="muted">
+          内容包就是一份 JSON：新的随机事件、新道具、新天赋，或者对平衡的调整。
+          导入后立刻生效——不用重装 APK，也不用重新开一局。
+        </p>
+
+        <h3 class="build-title">当前生效</h3>
+        <div class="content-status" id="content-status"></div>
+
+        <h3 class="build-title">① 导入本地 JSON 文件</h3>
+        <p class="muted small">文件只在这台设备上读（FileReader），不上传、不联网。</p>
+        <div class="start-actions">
+          <button type="button" id="btn-content-file" class="ghost">📂 选择 JSON 文件</button>
+          <input type="file" id="content-file-input" accept="application/json,.json" hidden />
+        </div>
+
+        <h3 class="build-title">② 粘贴 JSON 文本</h3>
+        <textarea
+          id="content-text"
+          class="content-text"
+          rows="5"
+          spellcheck="false"
+          placeholder='{"format":1,"meta":{"name":"我的内容包","version":"1.0.0"},"events":[…]}'
+        ></textarea>
+        <div class="start-actions">
+          <button type="button" id="btn-content-text" class="ghost">应用粘贴的 JSON</button>
+        </div>
+
+        <h3 class="build-title">③ 从 URL 拉取</h3>
+        <p class="muted small">只认 https 地址；填别人分享的包地址，点一下就能拉下来应用。</p>
+        <div class="content-row">
+          <input id="content-url" type="url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://example.com/pack.json" />
+          <button type="button" id="btn-content-url" class="ghost">⬇️ 拉取并应用</button>
+        </div>
+
+        <div class="content-warnings" id="content-warnings"></div>
+
+        <div class="start-actions">
+          <button type="button" id="btn-content-reset" class="ghost">↺ 恢复官方内容</button>
+          <button type="button" id="btn-content-close" class="ghost">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 高考志愿填报 ---------- -->
+    <div class="overlay hidden" id="volunteer-modal">
+      <div class="card wide-card volunteer-card">
+        <div class="event-title">🎯 高考志愿填报</div>
+        <div class="volunteer-head" id="volunteer-head"></div>
+        <div class="volunteer-rumor" id="volunteer-rumor"></div>
+        <div class="volunteer-body">
+          <div class="volunteer-slots" id="volunteer-slots"></div>
+          <div class="volunteer-options" id="volunteer-options"></div>
+        </div>
+        <div class="volunteer-foot" id="volunteer-foot">
+          <label class="switch-row volunteer-adjust">
+            <input type="checkbox" id="volunteer-adjust" />
+            服从专业调剂：六个志愿全部滑档时，招生办会在还有名额的专业里给你捞一个；不勾就可能落榜（只能等征集志愿或复读）。
+          </label>
+          <div class="start-actions">
+            <button type="button" id="btn-volunteer-submit" class="primary big">提交志愿</button>
+          </div>
+        </div>
+        <div class="volunteer-result hidden" id="volunteer-result"></div>
+        <div class="start-actions">
+          <button type="button" id="btn-volunteer-continue" class="ghost big" hidden>看这一局的结局 →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 结局 ---------- -->
+    <div class="overlay hidden" id="ending-modal">
+      <div class="card ending-card">
+        <div id="ending-body"></div>
+        <div class="start-actions">
+          <button id="btn-restart" class="primary big">再来一局</button>
+          <button id="btn-ending-gallery" class="ghost big">📖 查看图鉴</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast hidden" id="toast"></div>
+    <div class="turn-lines hidden" id="turn-lines"></div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
