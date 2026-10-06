@@ -78,6 +78,20 @@
       </div>
     </header>
 
+    <!-- ---------- 更新提示（推送：有新内容时才出现） ---------- -->
+    <div class="update-banner hidden" id="update-banner" role="status">
+      <span class="update-banner-icon" id="update-banner-icon">🔄</span>
+      <div class="update-banner-text">
+        <b id="update-banner-title">有新内容</b>
+        <span class="muted small" id="update-banner-detail"></span>
+      </div>
+      <div class="update-banner-actions">
+        <button type="button" id="btn-update-now" class="primary">立即更新</button>
+        <button type="button" id="btn-update-later" class="ghost">稍后</button>
+        <button type="button" id="btn-update-ignore" class="ghost">忽略这个版本</button>
+      </div>
+    </div>
+
     <!-- ---------- 三栏主体 ---------- -->
     <main class="layout" id="layout" hidden>
       <section class="panel panel-status">
@@ -338,6 +352,16 @@
           <input id="content-url" type="url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://example.com/pack.json" />
           <button type="button" id="btn-content-url" class="ghost">⬇️ 拉取并应用</button>
         </div>
+
+        <h3 class="build-title">④ 检查更新（推送）</h3>
+        <p class="muted small">
+          配了更新清单地址（<code>content/update-endpoint.json</code>，或服务端 <code>--update-url</code>）之后，
+          游戏启动时会自动问一句"有没有新内容"，有就弹一条提示。这里可以随时手动再问一次。
+        </p>
+        <div class="start-actions">
+          <button type="button" id="btn-content-update" class="ghost">📡 检查更新</button>
+        </div>
+        <div class="content-status" id="update-status"></div>
 
         <div class="content-warnings" id="content-warnings"></div>
 

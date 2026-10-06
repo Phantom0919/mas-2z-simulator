@@ -30,7 +30,14 @@ import {
   viewState,
 } from '../src/engine.js';
 import { BACKGROUNDS, GOALS, TRAITS, TRACKS } from '../src/data/character.js';
-import { parsePackText } from '../src/content.js';
+import { parseJsonObjectText, parsePackText } from '../src/content.js';
+import {
+  MAX_MANIFEST_BYTES,
+  UPDATE_STATUS,
+  decideUpdate,
+  disabledUpdate,
+  isAllowedManifestUrl,
+} from '../src/update.js';
 import { DEFAULT_WEEKS_PER_SEMESTER, ELECTIVE_KEYS, ELECTIVE_PICK, SUBJECT_MAP } from '../src/data/school.js';
 
 /**
@@ -102,6 +109,103 @@ function contentError(pack, fallback) {
   return detail ? `内容包有问题：${detail}` : fallback;
 }
 
+/* ------------------------------------------------------- 更新检查（推送） */
+
+/** 清单拉取超时（老 WebView 没有 AbortSignal.timeout，就自己搭一个）。 */
+function manifestSignal(ms) {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(ms);
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
+/** 页面里读一份 JSON：宽容 BOM / 中文标点（和服务端共用同一个解析器）。 */
+async function fetchJsonObject(target, label) {
+  const response = await fetch(target, { cache: 'no-store', signal: manifestSignal(5000) });
+  if (!response.ok) throw new GameError(`HTTP ${response.status}`);
+  const text = await response.text();
+  const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(text).length : text.length;
+  if (bytes > MAX_MANIFEST_BYTES) throw new GameError(`内容太大（${bytes} 字节，上限 ${MAX_MANIFEST_BYTES}）`);
+  return parseJsonObjectText(text, label);
+}
+
+function isSameOrigin(value) {
+  try {
+    return new URL(value).origin === location.origin;
+  } catch {
+    return false;
+  }
+}
+
+/** 读 `content/update-endpoint.json`（和网页版 / 服务端同一份配置）。读不到 = 不检查更新。 */
+async function readUpdateEndpointInPage() {
+  try {
+    const data = await fetchJsonObject('content/update-endpoint.json', '更新配置');
+    return {
+      manifest: typeof data?.manifest === 'string' ? data.manifest.trim() : '',
+      channel: typeof data?.channel === 'string' && data.channel.trim() ? data.channel.trim() : 'stable',
+    };
+  } catch {
+    return { manifest: '', channel: 'stable' };
+  }
+}
+
+/**
+ * 离线 / 手机端的更新检查：没有 Node 服务端代拉，只能页面自己拉。
+ *
+ * 准入规则和服务端略有不同：**同源地址一律放行**（那是游戏自己的文件，不存在 SSRF 问题），
+ * 跨域才走 `isAllowedManifestUrl`（https，或回环 / 内网的 http）。
+ * 跨域拉清单要求对方给了 CORS 头——对象存储和 GitHub Pages 一般都有；
+ * 拉不到就是"什么都不做"，绝不能影响游戏本身。
+ */
+async function runUpdateCheckInPage(url, channel, ignored) {
+  const endpoint = await readUpdateEndpointInPage();
+  const target = String(url ?? '').trim() || endpoint.manifest;
+  const activeChannel = String(channel ?? '').trim() || endpoint.channel;
+  if (!target) return { ok: true, ...disabledUpdate(), manifestUrl: '' };
+
+  let manifestUrl = '';
+  try {
+    manifestUrl = new URL(target, location.href).href;
+  } catch {
+    return { ok: true, ...disabledUpdate(`更新清单地址看不懂：${target}`), manifestUrl: target, status: UPDATE_STATUS.INVALID };
+  }
+  if (!isSameOrigin(manifestUrl) && !isAllowedManifestUrl(manifestUrl)) {
+    return {
+      ok: true,
+      ...disabledUpdate(`更新清单地址不允许（只支持 https，或回环 / 内网的 http）：${manifestUrl}`),
+      manifestUrl,
+      status: UPDATE_STATUS.INVALID,
+    };
+  }
+
+  let manifest;
+  try {
+    manifest = await fetchJsonObject(manifestUrl, '更新清单');
+  } catch (error) {
+    return {
+      ok: true,
+      ...disabledUpdate(`拉取更新清单失败：${error?.message ?? '网络不可用'}`),
+      manifestUrl,
+      status: UPDATE_STATUS.UNREACHABLE,
+    };
+  }
+
+  const status = engineApi.contentStatus?.() ?? null;
+  const installed = status?.active
+    ? { checksum: status.checksum, version: status.summary?.version ?? '', name: status.summary?.name ?? '' }
+    : null;
+  const decision = decideUpdate({
+    manifest,
+    manifestUrl,
+    installed,
+    appVersion: engineApi.GAME_VERSION ?? '',
+    channel: activeChannel,
+    ignoredChecksum: String(ignored ?? ''),
+  });
+  return { ok: true, ...decision, manifestUrl };
+}
+
 function optionsPayload() {
   return {
     // 离线模式没有服务端，这里顺手告诉前端一声（前端会用 view/log 而不是接口探活）
@@ -160,6 +264,12 @@ export function createLocalApi() {
 
       if (route === '/api/options') {
         return optionsPayload();
+      }
+
+      /* ------------------------------------------------- 更新清单（推送） */
+
+      if (route === '/api/update') {
+        return runUpdateCheckInPage(query.get('url'), query.get('channel'), query.get('ignored'));
       }
 
       /* -------------------------------------------------- 内容包（热更新） */

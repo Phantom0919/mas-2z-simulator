@@ -1,0 +1,6 @@
+{
+  "format": 1,
+  "manifest": "",
+  "channel": "stable",
+  "note": "把 manifest 填成更新清单的地址，启动时就会检查更新：线上写 https://…/update-manifest.json，跟游戏同源写 /content/update-manifest.json。留空 = 不检查（默认，离线优先）。另外两个覆盖方式：环境变量 MAS2Z_UPDATE_URL、启动参数 --update-url。"
+}

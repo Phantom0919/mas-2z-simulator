@@ -1,6 +1,6 @@
 # 发展建议 · ROADMAP
 
-> 对象：马鞍山二中模拟器（`package.json` 2.6.0 / `engine.js` `GAME_VERSION` 2.6.0）
+> 对象：马鞍山二中模拟器（`package.json` 2.7.0 / `engine.js` `GAME_VERSION` 2.7.0）
 > 这份文档写于 v2.6 三件事（内容包热更新 / 高考志愿填报 / 因果链事件）正在同时落地的过程中。
 > 所有数字都是**当场实测**出来的，不是从 README 抄的。
 

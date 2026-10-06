@@ -38,7 +38,14 @@ import {
   submitVolunteers,
   viewState,
 } from './engine.js';
-import { parsePackText } from './content.js';
+import { parseJsonObjectText, parsePackText } from './content.js';
+import {
+  MAX_MANIFEST_BYTES,
+  UPDATE_STATUS,
+  decideUpdate,
+  disabledUpdate,
+  isAllowedManifestUrl,
+} from './update.js';
 import { BACKGROUNDS, GOALS, TRAITS, TRACKS } from './data/character.js';
 import { DIFFICULTY } from './engine.js';
 import { DEFAULT_WEEKS_PER_SEMESTER, ELECTIVE_KEYS, ELECTIVE_PICK, SUBJECT_MAP } from './data/school.js';
@@ -47,6 +54,13 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const DEFAULT_WEB_ROOT = join(__dirname, '..', 'web');
 /** 热更新的内容包落盘位置：服务端/Electron 重启之后照样生效。 */
 const PACK_FILE = join(__dirname, '..', 'saves', 'content-pack.json');
+/**
+ * 更新清单地址的配置文件（跟着 web/ 走，APK / 网页版 / Electron 各读自己那份）。
+ * 空字符串 = 不检查更新，这是默认值：**离线优先**，没配置就一次网络请求都不发。
+ */
+const ENDPOINT_FILE = join(__dirname, '..', 'web', 'content', 'update-endpoint.json');
+/** 清单拉取超时：清单拉不动，不能让启动页陪着等。 */
+const MANIFEST_TIMEOUT_MS = 5000;
 
 /** 把生效的内容包写进 saves/，下次启动自动恢复。 */
 async function saveActivePack(pack) {
@@ -85,6 +99,101 @@ export async function applyPackAtBoot(file = null) {
     return result;
   }
   return result;
+}
+
+/* ------------------------------------------------ 更新清单（给玩家推送更新） */
+
+/**
+ * 读配置里的清单地址：命令行 `--update-url` > 环境变量 `MAS2Z_UPDATE_URL` > `web/content/update-endpoint.json`。
+ *
+ * 三者都没有（或写成空字符串）就是"不检查更新"——**默认离线优先**：
+ * 没配置就一次网络请求都不发，省得玩家一开游戏就被一个连不上的地址拖三秒。
+ */
+export async function readUpdateEndpoint(defaults = {}) {
+  const fromFile = { manifest: '', channel: 'stable' };
+  try {
+    const parsed = JSON.parse(await readFile(ENDPOINT_FILE, 'utf8'));
+    if (typeof parsed?.manifest === 'string') fromFile.manifest = parsed.manifest.trim();
+    if (typeof parsed?.channel === 'string' && parsed.channel.trim()) fromFile.channel = parsed.channel.trim();
+  } catch {
+    // 没有配置文件是完全正常的状态（默认就是不检查）
+  }
+  const manifest = (defaults.manifest ?? '').trim() || (process.env.MAS2Z_UPDATE_URL ?? '').trim() || fromFile.manifest;
+  const channel = (defaults.channel ?? '').trim() || fromFile.channel || 'stable';
+  return { manifest, channel };
+}
+
+/**
+ * 拉更新清单文本。三道护栏，都是"服务端代拉"必须有的：
+ *   1. 地址准入 `isAllowedManifestUrl`：拒绝 file: / data: 和云元数据端点；
+ *   2. 5 秒超时：清单拉不动，不能让启动页陪着等；
+ *   3. 64 KB 上限：清单是索引，没有任何"大"的理由——顺便挡住把内存拉爆的地址。
+ */
+async function fetchManifestText(target) {
+  let response;
+  try {
+    response = await fetch(target, { cache: 'no-store', signal: AbortSignal.timeout(MANIFEST_TIMEOUT_MS) });
+  } catch (error) {
+    const reason = error?.name === 'TimeoutError' ? `超过 ${MANIFEST_TIMEOUT_MS / 1000} 秒没有响应` : error?.message ?? '网络不可用';
+    return { ok: false, reason };
+  }
+  if (!response.ok) return { ok: false, reason: `HTTP ${response.status}` };
+
+  const declared = Number(response.headers.get('content-length') ?? '0');
+  if (Number.isFinite(declared) && declared > MAX_MANIFEST_BYTES) {
+    return { ok: false, reason: `清单太大了（声明 ${declared} 字节，上限 ${MAX_MANIFEST_BYTES}）` };
+  }
+  const text = await response.text();
+  if (Buffer.byteLength(text, 'utf8') > MAX_MANIFEST_BYTES) {
+    return { ok: false, reason: `清单太大了（上限 ${MAX_MANIFEST_BYTES} 字节）` };
+  }
+  try {
+    return { ok: true, manifest: parseJsonObjectText(text, '更新清单') };
+  } catch (error) {
+    return { ok: false, reason: error.message };
+  }
+}
+
+/** 本地"已装的内容包"信息，喂给 decideUpdate 做比对（没装过就是内置内容）。 */
+function installedPackInfo() {
+  const status = contentStatus();
+  if (!status.active) return null;
+  return { checksum: status.checksum, version: status.summary?.version ?? '', name: status.summary?.name ?? '' };
+}
+
+/**
+ * 跑一次更新检查：这是"推送"在服务端的全部实现——客户端问一句，服务端代拉清单并给出结论。
+ *
+ * 让服务端代拉（而不是浏览器直接 fetch）是为了绕开两件麻烦事：
+ *   - CORS：对象存储上的清单不一定配了跨域头；
+ *   - 准入：地址黑名单只有一处实现，网页端 / 桌面端 / 手机离线端不用各写一遍。
+ */
+export async function runUpdateCheck({ manifestUrl, channel = 'stable', ignoredChecksum = '' } = {}) {
+  if (!manifestUrl) return { ...disabledUpdate(), manifestUrl: '' };
+  if (!isAllowedManifestUrl(manifestUrl)) {
+    return {
+      ...disabledUpdate(`更新清单地址不允许（只支持 https，或回环 / 内网的 http）：${manifestUrl}`),
+      manifestUrl,
+      status: UPDATE_STATUS.INVALID,
+    };
+  }
+  const fetched = await fetchManifestText(manifestUrl);
+  if (!fetched.ok) {
+    return {
+      ...disabledUpdate(`拉取更新清单失败：${fetched.reason}`),
+      manifestUrl,
+      status: UPDATE_STATUS.UNREACHABLE,
+    };
+  }
+  const decision = decideUpdate({
+    manifest: fetched.manifest,
+    manifestUrl,
+    installed: installedPackInfo(),
+    appVersion: GAME_VERSION,
+    channel,
+    ignoredChecksum,
+  });
+  return { ...decision, manifestUrl };
 }
 
 const MIME = {
@@ -203,6 +312,9 @@ export function createGameServer({
   webRoot = DEFAULT_WEB_ROOT,
   srcRoot = join(DEFAULT_WEB_ROOT, '..'),
   store = createSessionStore(),
+  updateUrl = null,
+  updateChannel = '',
+  disableUpdate = false,
 } = {}) {
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -362,6 +474,25 @@ export function createGameServer({
       /* ---------------------------------------------------- 热更新：内容包 */
 
       // 当前生效的内容包
+      if (pathname === '/api/update' && req.method === 'GET') {
+        /*
+         * 客户端问一句"有没有新内容"，服务端代拉清单并给结论。
+         *   ?url=      临时换一个清单（测试 / 换通道看效果用；正式部署写 --update-url）
+         *   ?channel=  覆盖通道
+         *   ?ignored=  玩家点过"忽略这个版本"的校验和
+         */
+        const endpoint = disableUpdate
+          ? { manifest: '', channel: '' }
+          : await readUpdateEndpoint({ manifest: updateUrl ?? '', channel: updateChannel });
+        const decided = await runUpdateCheck({
+          manifestUrl: (url.searchParams.get('url') ?? '').trim() || endpoint.manifest,
+          channel: (url.searchParams.get('channel') ?? '').trim() || endpoint.channel || 'stable',
+          ignoredChecksum: (url.searchParams.get('ignored') ?? '').trim(),
+        });
+        sendJson(res, 200, { ok: true, ...decided });
+        return;
+      }
+
       if (pathname === '/api/content' && req.method === 'GET') {
         const status = contentStatus();
         sendJson(res, 200, {
@@ -532,7 +663,20 @@ if (isMain) {
     console.error(`⚠️ 内容包没有加载（改用内置内容继续启动）：${error.message}`);
   }
   if (packed?.ok) console.log(`🔄 已加载内容包：${packed.summary.name}${packed.summary.version ? ` v${packed.summary.version}` : ''}（${packed.summary.total} 项）`);
-  const server = createGameServer();
+  const server = createGameServer({
+    updateUrl: args.updateUrl !== undefined ? String(args.updateUrl) : null,
+    updateChannel: args.channel !== undefined ? String(args.channel) : '',
+    disableUpdate: Boolean(args.noUpdate),
+  });
+  // 更新清单的配置状态直接打出来：不然"为什么没弹更新提示"要翻半天代码
+  const endpoint = Boolean(args.noUpdate)
+    ? { manifest: '', channel: '' }
+    : await readUpdateEndpoint({ manifest: args.updateUrl !== undefined ? String(args.updateUrl) : '', channel: args.channel ? String(args.channel) : '' });
+  console.log(
+    endpoint.manifest
+      ? `📡 更新清单：${endpoint.manifest}（通道 ${endpoint.channel}）`
+      : '📡 更新清单：未配置（不检查更新；用 --update-url <地址> 打开）',
+  );
   server.listen(port, host, () => {
     const address = server.address();
     console.log(`马鞍山二中模拟器 · 网页版已启动： http://${host}:${address.port}`);

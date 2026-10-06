@@ -224,17 +224,32 @@ function sections() {
  * @returns {object}
  */
 export function parsePackText(input) {
+  return parseJsonObjectText(input, '内容包');
+}
+
+/**
+ * 上面那套"看得懂玩家手写 JSON"的逻辑，抽成通用的：`label` 只影响报错文案。
+ *
+ * 更新清单（src/update.js）是第二个用户：它同样是玩家/运营手写在 Windows 上的
+ * 一个小 JSON，同样会带 BOM、同样会写出中文引号。两处共用一份实现，
+ * 免得"内容包能读、清单读不了"这种莫名其妙的不一致。
+ *
+ * @param {unknown} input
+ * @param {string} [label] 报错里怎么称呼这个东西
+ * @returns {object}
+ */
+export function parseJsonObjectText(input, label = 'JSON') {
   if (!(typeof input === 'string')) {
     if (isPlainObject(input)) return input;
-    throw new Error('内容包应该是一段 JSON 文本或一个 JSON 对象。');
+    throw new Error(`${label}应该是一段 JSON 文本或一个 JSON 对象。`);
   }
   // BOM / 零宽字符 / NBSP / 首尾空白：这些"看不见的字符"是 Windows 上最常见的第一道坎
   const text = input.replace(/^[\uFEFF\u200B\u00A0\s]+/, '').replace(/[\uFEFF\u200B]+$/, '').trim();
-  if (!text) throw new Error('内容包是空的：没有读到任何 JSON 文本。');
+  if (!text) throw new Error(`${label}是空的：没有读到任何 JSON 文本。`);
   if (text[0] !== '{') {
     const head = text.slice(0, 12).replace(/\s+/g, ' ');
     const more = text[0] === '[' ? '（顶层得是对象，把数组放进 events / items 这些字段里）' : '';
-    throw new Error(`内容包必须以 { 开头，现在开头是 "${head}"${more}。`);
+    throw new Error(`${label}必须以 { 开头，现在开头是 "${head}"${more}。`);
   }
 
   let data;
@@ -248,9 +263,9 @@ export function parsePackText(input) {
         : /(^|\s)\/\/|\/\*/.test(text)
           ? '（JSON 不支持 // 或 /* */ 注释，删掉即可）'
           : '（常见原因：少一个逗号 / 多一个引号 / 用了单引号 / 括号没配对）';
-    throw new Error(`内容包不是合法的 JSON：${error.message}${hint}`);
+    throw new Error(`${label}不是合法的 JSON：${error.message}${hint}`);
   }
-  if (!isPlainObject(data)) throw new Error('内容包的顶层必须是一个 JSON 对象（用 { } 包起来）。');
+  if (!isPlainObject(data)) throw new Error(`${label}的顶层必须是一个 JSON 对象（用 { } 包起来）。`);
   return data;
 }
 

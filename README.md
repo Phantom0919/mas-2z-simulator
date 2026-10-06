@@ -1,4 +1,4 @@
-# 马鞍山二中模拟器 · v2.6
+# 马鞍山二中模拟器 · v2.7
 
 一个**零依赖的 Node.js 高中生活模拟器**。你是马鞍山二中的高一新生，三年、六个学期、36 个星期，
 每个星期要在一堆选择里活下来：主行动 + 周末安排，一共 **72 次决策**；高考之后还有最后一关——**填志愿**。
@@ -10,6 +10,15 @@
 > ⚠️ 本模拟器中的事件、人物、分数线和结局**全部为虚构娱乐内容**，与马鞍山市第二中学及任何真实学校、机构无关。
 
 ---
+
+## v2.7 新增了什么
+
+| 系统 | 内容 |
+| --- | --- |
+| 📡 **给玩家推送更新** | 一个固定地址上的**更新清单**：客户端启动时问一句"有没有新内容"，有就弹一条横幅。**默认不发任何网络请求**（离线优先），配了地址才启用 |
+| 🎚️ **三种配置 + 三种玩家选择** | 服务端 `--update-url` / 环境变量 / `web/content/update-endpoint.json`；玩家可以「立即更新 / 稍后 / 忽略这个版本」，清单写 `auto` 才静默装 |
+| 🛡️ **推送也有护栏** | 地址准入（https，或回环/内网 http；拒绝 `file:`/`data:`/云元数据端点）、5 秒超时、64 KB 上限；清单坏了就"什么都不做"，绝不挡住游戏 |
+| 🧰 **推送自查工具** | `node src/cli.js --check-update [地址]`，地址可以是 https、内网 http 或**本地清单文件** |
 
 ## v2.6 新增了什么
 
@@ -160,6 +169,53 @@ node src/server.js --port 8080
 - 现成可玩的示例：`web/content/official-pack.json`（2 个新事件 + 保温杯 + 两处平衡调整）。
 - 校验不过就**整包拒装**，错误会定位到"事件 id + 第几个选项 + 字段"。
 - 一个诚实的限制：`cond` / `effect` / `outcome` 是函数，JSON 装不下，快照会**跳过并逐条点名**这些事件。
+
+### 给玩家推送更新（更新清单）
+
+上面那套热更新解决的是**拉**——玩家得自己找到包再导入。要**推**，就配一个更新清单（manifest）：
+
+```bash
+# ① 生成内容包，顺手记下摘要里的「校验和」（8 位十六进制，就是清单要填的 checksum）
+node tools/build-content-pack.mjs --out web/content/weekly-pack.json \
+     --name "周更内容包" --version 2.7.1
+#    web/content/update-manifest.json 是一份可以直接抄的清单
+
+# ② 把包和清单放到任意 https 上（对象存储 / GitHub Pages / 自己的服务器），然后让游戏知道清单在哪：
+node src/server.js --update-url https://example.com/mas2z/update-manifest.json
+#    也可以：环境变量 MAS2Z_UPDATE_URL，或写进 web/content/update-endpoint.json 的 manifest 字段
+#    （网页版和手机 APK 都读 update-endpoint.json；**默认留空 = 不检查更新**，离线优先）
+
+# ③ 自己先看一眼结论，别让玩家当小白鼠
+node src/cli.js --check-update https://example.com/mas2z/update-manifest.json
+node src/cli.js --check-update web/content/update-manifest.json      # 本地清单文件也行
+```
+
+清单长这样（`url` 可以写相对路径，相对清单自己的地址解析——这样"游戏服务端自己托管内容"不用写死域名）：
+
+```json
+{
+  "format": 1,
+  "channel": "stable",
+  "latest": {
+    "version": "2.6.1",
+    "url": "official-pack.json",
+    "checksum": "51333b01",
+    "notes": "秋季内容包：雨夜图书馆、冬季长跑接力、保温杯（枸杞版）",
+    "releasedAt": "2026-10-01",
+    "requires": { "app": ">=2.6.0" },
+    "auto": false,
+    "mandatory": false
+  }
+}
+```
+
+- 客户端启动时 `GET /api/update`，**服务端代拉清单**并给出结论（顺带绕开 CORS：对象存储不一定配了跨域头）
+- 有新内容时顶部弹一条横幅：**立即更新 / 稍后 / 忽略这个版本**。忽略只忽略这一版，下次有新版本还会提示
+- 清单写 `"auto": true` → 静默安装；写 `"mandatory": true` → 不提供"稍后 / 忽略"
+- **判断"变了没有"只看 checksum，不看版本号**——所以"版本号没动、内容改过"照样能推下去
+- **绝不自动降级**：清单版本比本地低时只提示、不覆盖（玩家手里的包可能比线上新）
+- 地址准入：只允许 https，或回环 / 内网的 http；`file:` / `data:` / `169.254.169.254`（云元数据端点）一律拒绝
+- 拉不到、清单坏了 = **什么都不做**：横幅不弹、报错不弹，游戏该玩玩（`unreachable` 和 `invalid` 在界面上也是两句话）
 
 ### 桌面客户端（Electron）
 

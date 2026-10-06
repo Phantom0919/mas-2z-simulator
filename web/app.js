@@ -13,6 +13,7 @@
  */
 
 import { createLocalApi } from './local-api.js';
+import { summarizeUpdate } from '../src/update.js';
 import {
   castCardHtml,
   relationsSummaryHtml,
@@ -1544,6 +1545,8 @@ async function refreshContentStatus() {
 async function openContentModal() {
   $('content-warnings').innerHTML = '';
   $('content-modal').classList.remove('hidden');
+  // 打开面板就顺手问一次更新：这样"没配更新地址"也能被看见，而不是一个空框让人猜
+  void checkUpdatesFromPanel();
   try {
     await refreshContentStatus();
   } catch (error) {
@@ -1652,6 +1655,191 @@ async function fetchContentFromUrl() {
 
 async function resetContentPack() {
   await runContentRequest('/api/content/reset', {}, '已恢复官方内容。');
+}
+
+/* ------------------------------------------------------- 更新检查（推送） */
+
+/** 玩家点过"忽略这个版本"的那个校验和：只忽略这一版，下次再来还会提示。 */
+const UPDATE_IGNORE_KEY = 'mas2z-update-ignore-v1';
+
+/** 本次会话里点过"稍后"：这一轮不再弹，刷新页面后还会提醒。 */
+let updatePostponed = false;
+
+/** 有弹层开着时先把横幅挂在这里，等弹层关了再弹（见 watchOverlays）。 */
+let pendingUpdateBanner = null;
+let overlayWatcher = null;
+
+const UPDATE_STATUS_LABEL = {
+  'up-to-date': '已是最新',
+  update: '可更新',
+  ignored: '已忽略',
+  downgrade: '线上更旧',
+  'channel-mismatch': '通道不匹配',
+  incompatible: '需先升级客户端',
+  invalid: '清单有问题',
+  unreachable: '拉不到清单',
+  disabled: '未启用',
+};
+
+function ignoredChecksum() {
+  try {
+    return localStorage.getItem(UPDATE_IGNORE_KEY) ?? '';
+  } catch {
+    // 隐私模式 / 禁用存储：当成"没忽略过"，不影响功能
+    return '';
+  }
+}
+
+/** 问一次"有没有新内容"。调用方负责处理异常（启动自检是静默的）。 */
+function checkUpdates() {
+  const ignored = ignoredChecksum();
+  return api(ignored ? `/api/update?ignored=${encodeURIComponent(ignored)}` : '/api/update');
+}
+
+function hideUpdateBanner() {
+  pendingUpdateBanner = null;
+  $('update-banner').classList.add('hidden');
+}
+
+/** 有没有弹层开着？（`.overlay` 的 z-index 比横幅高，开着的时候横幅会被盖住） */
+function anyOverlayOpen() {
+  return [...document.querySelectorAll('.overlay')].some((node) => !node.classList.contains('hidden'));
+}
+
+/**
+ * 有弹层开着就先记住、等关了再弹。
+ *
+ * 起因是一个真被测出来的问题：开局那个"开学第一天"弹层一直在（z-index 40 > 横幅），
+ * 横幅虽然画出来了、按钮却点不动——"看得见点不动"比"看不见"更糟。
+ * 用 MutationObserver 而不是去每个关闭弹层的地方插一行，是因为关弹层的路径太多
+ * （开局、事件、商店、结局、志愿……），漏一个就会复现这个 bug。
+ */
+function watchOverlays() {
+  if (overlayWatcher) return;
+  overlayWatcher = new MutationObserver(() => {
+    if (!pendingUpdateBanner || anyOverlayOpen()) return;
+    const info = pendingUpdateBanner;
+    pendingUpdateBanner = null;
+    showUpdateBannerNow(info);
+  });
+  for (const node of document.querySelectorAll('.overlay')) {
+    overlayWatcher.observe(node, { attributes: true, attributeFilter: ['class'] });
+  }
+}
+
+/** 把一次判定结果变成顶部那条横幅（弹层开着就先挂起）。 */
+function showUpdateBanner(info) {
+  if (anyOverlayOpen()) {
+    pendingUpdateBanner = info;
+    watchOverlays();
+    return;
+  }
+  showUpdateBannerNow(info);
+}
+
+function showUpdateBannerNow(info) {
+  const view = summarizeUpdate(info);
+  const banner = $('update-banner');
+  $('update-banner-title').textContent = view.title || '有新内容';
+  $('update-banner-detail').textContent = view.detail;
+  $('update-banner-icon').textContent = info.status === 'downgrade' ? '⬇️' : '🔄';
+  $('btn-update-now').textContent = info.status === 'downgrade' ? '仍然降级' : '立即更新';
+  // mandatory 的更新不提供"稍后 / 忽略"——但按钮只是藏起来，不是禁用
+  $('btn-update-later').hidden = !view.canIgnore;
+  $('btn-update-ignore').hidden = !view.canIgnore;
+  banner.classList.toggle('mandatory', Boolean(info.mandatory));
+  banner.classList.remove('hidden');
+  banner.dataset.checksum = info.latest?.checksum ?? '';
+  banner.dataset.packUrl = info.packUrl ?? '';
+}
+
+/** 真的去装：复用内容包面板那条请求（同一套校验、落盘、"已热更新"提示）。 */
+async function applyUpdateFromBanner() {
+  const packUrl = $('update-banner').dataset.packUrl ?? '';
+  if (!packUrl) {
+    toast('这条更新没有可用的内容包地址。');
+    return;
+  }
+  hideUpdateBanner();
+  await runContentRequest('/api/content/apply', { url: packUrl }, '已更新到最新内容。');
+}
+
+function ignoreUpdateVersion() {
+  const checksum = $('update-banner').dataset.checksum ?? '';
+  if (checksum) {
+    try {
+      localStorage.setItem(UPDATE_IGNORE_KEY, checksum);
+    } catch {
+      // 写不了就算了，下次还会提示，不是致命问题
+    }
+  }
+  hideUpdateBanner();
+  toast('这一版不再提示（下次有新版本还会提醒）。');
+}
+
+/** 把判定结果渲染成内容包面板里的一段人话。 */
+function renderUpdateStatus(info) {
+  const view = summarizeUpdate(info);
+  const latest = info.latest;
+  const statusLabel = UPDATE_STATUS_LABEL[info.status] ?? String(info.status ?? '未知');
+  const lines = [
+    `<div class="content-pack"><b>${escapeHtml(view.title)}</b>${
+      latest?.version ? `<span class="content-chip">v${escapeHtml(latest.version)}</span>` : ''
+    }<span class="content-chip">${escapeHtml(statusLabel)}</span></div>`,
+  ];
+  if (view.detail) lines.push(`<div class="muted small">${escapeHtml(view.detail)}</div>`);
+  if (latest) {
+    lines.push(`<div class="content-grid">
+      <span>线上校验和 <span class="content-mono">${escapeHtml(latest.checksum || '—')}</span></span>
+      ${latest.releasedAt ? `<span>发布于 ${escapeHtml(latest.releasedAt)}</span>` : ''}
+      ${info.packUrl ? `<span>地址 <span class="content-mono">${escapeHtml(info.packUrl)}</span></span>` : ''}
+    </div>`);
+  }
+  const reasons = (info.reasons ?? []).filter(Boolean);
+  if (reasons.length) lines.push(`<div class="muted small">${reasons.map((item) => escapeHtml(item)).join('<br />')}</div>`);
+  return lines.join('');
+}
+
+/** 面板里的"📡 检查更新"：结论写在面板里，能更新的话同时弹横幅。 */
+async function checkUpdatesFromPanel({ manual = false } = {}) {
+  // 玩家主动来问，就把"稍后"作废——否则点了稍后再自己点检查，反而什么都不显示
+  if (manual) updatePostponed = false;
+  const box = $('update-status');
+  box.className = 'content-status';
+  box.innerHTML = '<p class="muted small">正在检查……</p>';
+  let info;
+  try {
+    info = await checkUpdates();
+  } catch (error) {
+    box.innerHTML = `<p class="content-note bad">✕ 检查更新失败：${escapeHtml(error?.message ?? '未知错误')}</p>`;
+    return null;
+  }
+  box.innerHTML = renderUpdateStatus(info);
+  if (info.actionable && (manual || !updatePostponed)) showUpdateBanner(info);
+  else if (!info.actionable) hideUpdateBanner();
+  return info;
+}
+
+/**
+ * 启动自检：问一句"有没有新内容"。
+ *
+ * 三条"绝不能"决定了它的写法：**不能挡住游戏**（fire-and-forget）、
+ * **不能因为失败弹错**（整段 try 里吞掉）、**不能覆盖玩家手里的新包**
+ * （默认只提示，只有清单明确写 `auto: true` 且不是强制更新时才静默安装）。
+ */
+async function updateCheckOnBoot() {
+  if (updatePostponed) return;
+  try {
+    const info = await checkUpdates();
+    if (!info?.actionable) return;
+    if (info.status === 'update' && info.auto && !info.mandatory && info.packUrl) {
+      await runContentRequest('/api/content/apply', { url: info.packUrl }, '已自动更新到最新内容。');
+      return;
+    }
+    showUpdateBanner(info);
+  } catch {
+    // 断网 / 没起服务端 / 没配清单：什么都不做（离线优先）
+  }
 }
 
 /* ------------------------------------------------------------ 高考志愿填报 */
@@ -2272,6 +2460,15 @@ function bind() {
   $('btn-content-text').addEventListener('click', applyPastedContent);
   $('btn-content-url').addEventListener('click', fetchContentFromUrl);
   $('btn-content-reset').addEventListener('click', resetContentPack);
+  $('btn-content-update').addEventListener('click', () => void checkUpdatesFromPanel({ manual: true }));
+
+  // 更新提示（推送）：立即更新 / 稍后 / 忽略这一版
+  $('btn-update-now').addEventListener('click', applyUpdateFromBanner);
+  $('btn-update-later').addEventListener('click', () => {
+    updatePostponed = true;
+    hideUpdateBanner();
+  });
+  $('btn-update-ignore').addEventListener('click', ignoreUpdateVersion);
 
   // 志愿填报
   $('btn-volunteer-submit').addEventListener('click', submitVolunteer);
@@ -2367,6 +2564,8 @@ async function main() {
   } catch (error) {
     toast(`快速开局失败：${error.message}`);
   }
+  // 更新自检放在最后、而且不 await：它可能要等 5 秒网络，绝不能拖住界面
+  void updateCheckOnBoot();
 }
 
 /** 顶栏上标一下当前是"服务端"还是"离线单机"，离线时说明进度存在本机。 */

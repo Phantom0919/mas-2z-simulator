@@ -69,6 +69,13 @@ CHECKS = [
     ("assets/www/index.html", 'id="content-modal"', None),
     ("assets/www/app.js", "/api/volunteer", None),
     ("assets/www/local-api.js", "/api/content", None),
+    # v2.7：推送（更新清单）必须一起进包，而且默认必须是"不检查更新"
+    ("assets/src/update.js", "decideUpdate", None),
+    ("assets/src/update.js", "isAllowedManifestUrl", None),
+    ("assets/www/app.js", "/api/update", None),
+    ("assets/www/index.html", 'id="update-banner"', None),
+    ("assets/www/local-api.js", "runUpdateCheckInPage", None),
+    ("assets/www/content/update-endpoint.json", '"manifest": ""', None),
 ]
 
 

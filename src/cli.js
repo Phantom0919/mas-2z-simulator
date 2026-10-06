@@ -12,12 +12,14 @@
 
 import process from 'node:process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, resolve as resolvePath } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   CUSTOM_KNOBS,
   DIFFICULTY,
   EFF,
+  GAME_VERSION,
   GameError,
   SUBJECT_MAP,
   TOTAL_MAX,
@@ -53,6 +55,8 @@ import { ALL_SUBJECT_KEYS, SCHOOL, STAT_META, ELECTIVE_KEYS, DEFAULT_WEEKS_PER_S
 import { DEFAULT_PROFILE_FILE, loadProfile, profileStats, recordGame, saveProfile } from './profile.js';
 import { createPrompter } from './prompt.js';
 import { STRATEGIES, getStrategy } from './strategies.js';
+import { parseJsonObjectText } from './content.js';
+import { decideUpdate, describeUpdate, isAllowedManifestUrl } from './update.js';
 
 /* ------------------------------------------------------------------ 参数 */
 
@@ -853,6 +857,9 @@ ${SCHOOL.name} 模拟器 · 终端版 v2
   --no-adjust             填志愿时不服从调剂（滑档就真的没书读）
   --pack <文件>           启动时加载内容包（热更新）；给 --pack 不带值则读 saves/content-pack.json
   --content               打印当前内容包状态后退出
+  --check-update [地址]   跑一次更新检查（不给地址就读 web/content/update-endpoint.json）；
+                          地址可以是 https、回环/内网的 http，或本地清单文件路径
+  --update-url <地址>     配合 --check-update 用（等价于把地址写在 --check-update 后面）
   --seed <种子>           固定种子，结果可复现
 
 对局选项：
@@ -883,6 +890,104 @@ ${SCHOOL.name} 模拟器 · 终端版 v2
 `);
 }
 
+/* ------------------------------------------------------------ 更新检查 */
+
+/** 和网页版读同一份配置：`web/content/update-endpoint.json`（空 manifest = 不检查）。 */
+function readUpdateEndpointSync() {
+  try {
+    const parsed = JSON.parse(readFileSync(new URL('../web/content/update-endpoint.json', import.meta.url), 'utf8'));
+    return {
+      manifest: typeof parsed?.manifest === 'string' ? parsed.manifest.trim() : '',
+      channel: typeof parsed?.channel === 'string' && parsed.channel.trim() ? parsed.channel.trim() : 'stable',
+    };
+  } catch {
+    return { manifest: '', channel: 'stable' };
+  }
+}
+
+const installedPackInfoCli = () => {
+  const status = contentStatus();
+  return status.active ? { checksum: status.checksum, version: status.summary?.version ?? '', name: status.summary?.name ?? '' } : null;
+};
+
+/**
+ * `--check-update`：在命令行里跑一次"该不该给玩家推更新"的判定。
+ *
+ * 地址有三种写法，覆盖三种真实场景：
+ *   - 不给：读 `web/content/update-endpoint.json`，和网页版/手机端看的是同一份配置；
+ *   - `https://…`（或回环 / 内网的 http）：真的去拉，护栏和服务端一致（5 秒超时、64 KB 上限）；
+ *   - 本地文件路径：直接读——**写清单的时候自查用这个**，不用为了看一眼结论去起服务。
+ */
+async function runUpdateCheckCli(target, channel) {
+  const endpoint = readUpdateEndpointSync();
+  const url = String(target ?? '').trim() || endpoint.manifest;
+  if (!url) {
+    console.log(bold('\n📡 更新检查'));
+    console.log('  💤 没有配置更新清单地址（web/content/update-endpoint.json 里 manifest 是空的）。');
+    console.log('  想试一下：node src/cli.js --check-update web/content/update-manifest.json');
+    return;
+  }
+
+  const isRemote = /^https?:/i.test(url);
+  let manifest = null;
+  let manifestUrl = url;
+  let failure = '';
+
+  if (isRemote) {
+    if (!isAllowedManifestUrl(url)) {
+      failure = '地址不允许（只支持 https，或回环 / 内网的 http）';
+    } else {
+      try {
+        const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+        if (!response.ok) failure = `HTTP ${response.status}`;
+        else manifest = parseJsonObjectText(await response.text(), '更新清单');
+      } catch (error) {
+        failure = error?.name === 'TimeoutError' ? '超过 5 秒没有响应' : error?.message ?? '网络不可用';
+      }
+    }
+  } else {
+    // 本地文件：用 file:// 当基准地址，这样清单里写相对路径（"official-pack.json"）也能解析对
+    manifestUrl = new URL(`file:///${resolvePath(url).replace(/\\/g, '/')}`).href;
+    try {
+      manifest = parseJsonObjectText(readFileSync(url, 'utf8'), '更新清单');
+    } catch (error) {
+      failure = error.message;
+    }
+  }
+
+  console.log(bold('\n📡 更新检查'));
+  console.log(`  清单：${isRemote ? url : resolvePath(url)}`);
+  if (failure) {
+    console.log(red(`  ✕ ${failure}`));
+    if (isRemote) console.log('  （检查失败不影响游戏：客户端遇到这种情况就是"什么都不做"）');
+    return;
+  }
+
+  const decision = decideUpdate({
+    manifest,
+    manifestUrl,
+    installed: installedPackInfoCli(),
+    appVersion: GAME_VERSION,
+    channel: String(channel ?? '').trim() || endpoint.channel,
+    ignoredChecksum: String(argv.ignored ?? ''),
+  });
+  const installed = decision.installed;
+  console.log(`  通道：${decision.channel}`);
+  console.log(`  本地：${installed ? `${installed.name || '已装内容包'}${installed.version ? ` v${installed.version}` : ''}（校验和 ${installed.checksum}）` : '官方内置内容'}`);
+  if (decision.latest) {
+    const latest = decision.latest;
+    console.log(`  线上：v${latest.version}（校验和 ${latest.checksum}${latest.releasedAt ? `，${latest.releasedAt}` : ''}）`);
+    if (latest.notes) console.log(`  说明：${latest.notes}`);
+  }
+  console.log(`  结论：${describeUpdate(decision)}`);
+  if (decision.latest?.requires?.app) console.log(`  要求：游戏本体 ${decision.latest.requires.app}（当前 ${GAME_VERSION}）`);
+  if (decision.actionable && decision.packUrl) {
+    const target = decision.packUrl.startsWith('file:') ? fileURLToPath(decision.packUrl) : decision.packUrl;
+    console.log(`  更新：node src/cli.js --pack ${target.includes(' ') ? `"${target}"` : target}`);
+    console.log('        （网页 / 手机端会在界面上弹一条「有新内容」，点"立即更新"即可）');
+  }
+}
+
 async function main() {
   // 启动时先打内容包（热更新）：--pack <文件> 指定，默认读 saves/content-pack.json。
   // 必须排在 --content / --gallery 之前，否则 `--pack x --content` 会打印"加载前"的状态，
@@ -898,6 +1003,13 @@ async function main() {
     }
   }
 
+  if (argv.checkUpdate !== undefined) {
+    await runUpdateCheckCli(
+      typeof argv.checkUpdate === 'string' ? argv.checkUpdate : String(argv.updateUrl ?? ''),
+      argv.channel,
+    );
+    return;
+  }
   if (argv.gallery) {
     renderGallery(endingCatalog(), loadProfile(profileFile));
     return;
