@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0d1117" />
+
+    <title>马鞍山二中模拟器 · 官方网站</title>
+    <meta
+      name="description"
+      content="马鞍山二中模拟器：一个零依赖的 Node.js 高中生活模拟器。三年、六个学期、72 次抉择，29 个结局，还有高考后的志愿填报。网页直接试玩，安卓 0.5 MB 免安装，无广告无内购不联网。"
+    />
+    <meta name="keywords" content="马鞍山二中模拟器,高中生活模拟器,模拟器,志愿填报,网页游戏,安卓游戏,免费游戏" />
+    <link rel="canonical" href="./index.html" />
+    <link rel="icon" href="./assets/icon-192.png" />
+    <link rel="apple-touch-icon" href="./assets/icon-192.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="马鞍山二中模拟器" />
+    <meta property="og:title" content="马鞍山二中模拟器 · 三年 · 六个学期 · 72 次抉择" />
+    <meta
+      property="og:description"
+      content="一所虚构高中的三年：捏人开局的自由度、37 种行动、95 个随机事件、29 个结局，高考之后还要自己填六个志愿。点开就能玩。"
+    />
+    <meta property="og:image" content="./assets/og.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!--
+      CSP：页面只加载本站资源（图片 / 脚本 / 样式全在 docs/ 里），一个外链都没有。
+      这里放宽的只有 style-src 的 'unsafe-inline'——用来给个别元素写行内宽度。
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+
+    <link rel="stylesheet" href="./assets/style.css" />
+    <script src="./assets/site.js" defer></script>
+  </head>
+
+  <body id="top">
+    <a class="skip-link" href="#main">跳到正文</a>
+
+    <!-- ---------- 顶栏 ---------- -->
+    <header class="nav" id="nav">
+      <div class="nav-inner">
+        <a class="nav-brand" href="#top">
+          <span class="nav-mark" aria-hidden="true">贰中</span>
+          <span class="nav-name">马鞍山二中模拟器</span>
+        </a>
+        <nav class="nav-links" aria-label="页面导航">
+          <a href="#features">玩法</a>
+          <a href="#shots">截图</a>
+          <a href="#download">下载</a>
+          <a href="#updates">更新</a>
+          <a href="#faq">问答</a>
+          <a href="#community">交流</a>
+        </nav>
+        <a class="btn btn-small btn-primary nav-cta" href="./play/index.html">▶ 立即试玩</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ---------- 首屏 ---------- -->
+      <section class="hero">
+        <div class="hero-glow" aria-hidden="true"></div>
+        <div class="wrap hero-inner">
+          <p class="badge-row">
+            <span class="badge" data-version-badge>v2.8.0</span>
+            <span class="badge">网页 / 安卓 / 桌面 / 终端</span>
+            <span class="badge">免费 · 无广告 · 无内购</span>
+            <span class="badge">不联网也能玩</span>
+          </p>
+
+          <h1 class="hero-title">马鞍山二中模拟器</h1>
+          <p class="hero-tagline">三年 · 六个学期 · <strong>72 次抉择</strong></p>
+
+          <p class="hero-lead">
+            你是马鞍山二中（<em>虚构</em>）的高一新生。每个星期两个决定：主行动做什么、周末怎么安排。
+            没碰过的科目每周都在遗忘，熬夜刷题经常是负收益，几周前的选择会在期末回来找你。<br />
+            高考出分不是终点，<strong>最后一关是六个志愿怎么填</strong>。
+          </p>
+
+          <p class="hero-actions">
+            <a class="btn btn-primary btn-lg" href="./play/index.html">▶ 立即试玩（不用下载）</a>
+            <a class="btn btn-ghost btn-lg" href="#download">⬇ 下载安卓版</a>
+            <a
+              class="btn btn-channel btn-lg"
+              href="https://pd.qq.com/s/c38ht6k4r"
+              target="_blank"
+              rel="noopener noreferrer"
+              >💬 加入腾讯频道</a
+            >
+          </p>
+
+          <p class="hero-note">
+            在线版点开就能玩，存档在本地；安卓包约 <span data-apk-size>0.5 MB</span>，免安装框架、装完即玩。
+          </p>
+
+          <dl class="hero-stats">
+            <div><dt>行动</dt><dd>37</dd></div>
+            <div><dt>随机事件</dt><dd>95</dd></div>
+            <div><dt>剧情章节</dt><dd>36</dd></div>
+            <div><dt>结局图鉴</dt><dd>29</dd></div>
+            <div><dt>成就</dt><dd>79</dd></div>
+            <div><dt>自动化测试</dt><dd>300+</dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <!-- ---------- 卖点 ---------- -->
+      <section class="section" id="features">
+        <div class="wrap">
+          <h2 class="section-title">为什么值得玩一遍</h2>
+          <p class="section-sub">
+            不是一个点到底的数值游戏：每一次点击都在花掉你这周唯一的时间，而且很多选择几周后才有回音。
+          </p>
+
+          <div class="cards">
+            <article class="card">
+              <p class="card-icon" aria-hidden="true">🎯</p>
+              <h3>72 次真实的取舍</h3>
+              <p>
+                每周主行动 100% 效果，周末只有约 55%。学习、运动、社交、娱乐、关系、特长、大事——做这件事就做不了那件，
+                而「周末要不要也拿来刷题」本身就是个陷阱。
+              </p>
+            </article>
+
+            <article class="card">
+              <p class="card-icon" aria-hidden="true">🧬</p>
+              <h3>状态不是摆设</h3>
+              <p>
+                心情 0→100 对应学习效率 78%→108%，疲劳超过 45 开始线性掉效率，知识收益还会边际递减。
+                <strong>先睡一觉再学，往往比熬夜多刷两套卷子分更高。</strong>
+              </p>
+            </article>
+
+            <article class="card">
+              <p class="card-icon" aria-hidden="true">🧑‍🎨</p>
+              <h3>捏人机器</h3>
+              <p>
+                姓名、外号、14 个头像、7 种性格、11 种天赋选 2、5 个缺陷换属性点、9 套角色模板、8 根自定义难度滑杆。
+                同桌、死党、老对手、心动对象的名字也由你定。
+              </p>
+            </article>
+
+            <article class="card">
+              <p class="card-icon" aria-hidden="true">📋</p>
+              <h3>高考之后的最后一关</h3>
+              <p>
+                16 个院校专业组里挑 6 个平行志愿，冲 / 稳 / 保是真赌：今年的投档线会波动。
+                英语、数学、生物不达标会被退档，六个全滑档又不服从调剂，就是落榜结局。
+              </p>
+            </article>
+
+            <article class="card">
+              <p class="card-icon" aria-hidden="true">🔗</p>
+              <h3>因果链会回来找你</h3>
+              <p>
+                8 条因果链、21 个事件：几周前的一句承诺、借出去的一副耳机、雨山湖边的一次约定，
+                会在高考结束时决定你的<strong>毕业去向</strong>——但不会提前掐断你的高考。
+              </p>
+            </article>
+
+            <article class="card">
+              <p class="card-icon" aria-hidden="true">📖</p>
+              <h3>多周目收集</h3>
+              <p>
+                29 个结局、79 个成就、7 条剧情线 36 章、结局图鉴、跨局传承点（每玩满 2 局多得 1 点属性点）。
+                还有自由模式：什么时候高考由你自己决定。
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- 截图 ---------- -->
+      <section class="section section-alt" id="shots">
+        <div class="wrap">
+          <h2 class="section-title">看一眼就知道</h2>
+          <p class="section-sub">界面是同一个前端，网页、手机、桌面三端共用。点图片可以放大。</p>
+
+          <div class="gallery">
+            <figure class="shot shot-wide">
+              <button type="button" class="shot-btn" data-full="./assets/shots/setup.jpg" data-title="开局构筑：角色模板 + 捏人">
+                <img src="./assets/shots/setup.jpg" alt="开局构筑界面：9 套角色模板、姓名外号头像、属性点分配" loading="lazy" width="1000" height="703" />
+              </button>
+              <figcaption><strong>开局构筑</strong>9 套模板一键填好，姓名、外号、头像、性格、天赋、缺陷都能自己定。</figcaption>
+            </figure>
+
+            <figure class="shot">
+              <button type="button" class="shot-btn" data-full="./assets/shots/game.jpg" data-title="一周两段：主行动 + 周末安排">
+                <img src="./assets/shots/game.jpg" alt="游戏主界面：左侧属性与人物关系，中间本周行动，右侧校园日志" loading="lazy" width="1000" height="1214" />
+              </button>
+              <figcaption><strong>一周两段</strong>左边看状态和关系，中间挑本周行动，右边是这一周的校园日志。</figcaption>
+            </figure>
+
+            <figure class="shot">
+              <button type="button" class="shot-btn" data-full="./assets/shots/volunteer.jpg" data-title="高考志愿填报">
+                <img src="./assets/shots/volunteer.jpg" alt="高考志愿填报界面：六个平行志愿格与可以填的院校专业组" loading="lazy" width="900" height="633" />
+              </button>
+              <figcaption><strong>志愿填报</strong>6 个格子、16 个候选，冲稳保怎么排，你自己赌。</figcaption>
+            </figure>
+
+            <figure class="shot">
+              <button type="button" class="shot-btn" data-full="./assets/shots/ending.jpg" data-title="结局与成就">
+                <img src="./assets/shots/ending.jpg" alt="结局结算界面：结局标题、达成条件、成就与档案" loading="lazy" width="900" height="633" />
+              </button>
+              <figcaption><strong>29 个结局</strong>高考档次只是其中一半，另一半是你这三年养出来的路。</figcaption>
+            </figure>
+
+            <figure class="shot">
+              <button type="button" class="shot-btn" data-full="./assets/shots/update.jpg" data-title="推送更新：启动时问一句">
+                <img src="./assets/shots/update.jpg" alt="游戏界面顶部的更新提示横幅，带「立即更新 / 稍后 / 忽略」三个按钮" loading="lazy" width="900" height="633" />
+              </button>
+              <figcaption><strong>推送更新</strong>启动时问一句有没有新内容，玩家可以立即更新、稍后、忽略这个版本。</figcaption>
+            </figure>
+
+            <figure class="shot">
+              <button type="button" class="shot-btn" data-full="./assets/shots/content.jpg" data-title="热更新内容包">
+                <img src="./assets/shots/content.jpg" alt="内容包面板：导入 JSON 后显示新增事件、道具与平衡改动摘要" loading="lazy" width="900" height="633" />
+              </button>
+              <figcaption><strong>热更新</strong>导入一个 JSON 就有新事件、新道具、调过的平衡，不用重装。</figcaption>
+            </figure>
+
+            <figure class="shot shot-tall">
+              <button type="button" class="shot-btn" data-full="./assets/shots/mobile.jpg" data-title="手机竖屏">
+                <img src="./assets/shots/mobile.jpg" alt="手机竖屏下的游戏界面，按钮和文字自动排成一列" loading="lazy" width="500" height="900" />
+              </button>
+              <figcaption><strong>手机也顺手</strong>竖屏重排、按钮加大，可以「添加到主屏幕」当 App 用。</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- 下载 / 三种打开方式 ---------- -->
+      <section class="section" id="download">
+        <div class="wrap">
+          <h2 class="section-title">三种打开方式</h2>
+          <p class="section-sub">没有账号、没有服务器、没有内购。数据全部留在你自己的设备上。</p>
+
+          <div class="plans">
+            <article class="plan plan-best">
+              <p class="plan-tag">最省事</p>
+              <h3>🌐 在线试玩</h3>
+              <p class="plan-desc">点开就玩，进度存在浏览器本地（localStorage），支持「添加到主屏幕」离线玩。</p>
+              <p class="plan-actions"><a class="btn btn-primary" href="./play/index.html">▶ 开始游戏</a></p>
+            </article>
+
+            <article class="plan">
+              <p class="plan-tag">手机上最舒服</p>
+              <h3>🤖 安卓版 APK</h3>
+              <p class="plan-desc">
+                约 <span data-apk-size>0.5 MB</span>，不用装任何框架。装的时候系统会提示「未知来源应用」——因为它是个人项目、
+                没有上架商店。版本 <span data-apk-version>v2.8.0</span>。
+              </p>
+              <p class="plan-actions">
+                <a class="btn btn-primary" href="./download/马鞍山二中模拟器-安卓版.apk" download>⬇ 下载 APK</a>
+              </p>
+              <p class="plan-meta">SHA-256：<code data-apk-sha>打包时生成</code></p>
+            </article>
+
+            <article class="plan">
+              <p class="plan-tag">键盘党</p>
+              <h3>💻 桌面 / 终端</h3>
+              <p class="plan-desc">同一个引擎，懒得点鼠标就用命令行；也可以自己起个本地服务在电脑上玩。</p>
+              <pre class="code"><code>npm start        # 终端版
+npm run web      # 网页版（本地服务）</code></pre>
+            </article>
+          </div>
+
+          <p class="callout">
+            🛠️ 源码与引擎是零运行时依赖的 Node.js 项目（<code>src/engine.js</code> 一份纯逻辑，被终端 / 网页 / 桌面 / 安卓四端共用）。
+            装 APK 前可以先在电脑上跑一遍：<code>node src/cli.js --auto --strategy diligent</code>。
+          </p>
+        </div>
+      </section>
+
+      <!-- ---------- 更新 ---------- -->
+      <section class="section section-alt" id="updates">
+        <div class="wrap">
+          <h2 class="section-title">还在长：更新记录</h2>
+          <p class="section-sub">每个版本都做完整回归测试后才发；发版之后还能靠内容包继续加东西。</p>
+
+          <ol class="timeline">
+            <li>
+              <span class="tl-ver">v2.8</span>
+              <div class="tl-body">
+                <h3>官方发布页</h3>
+                <p>你现在看的这个页面：在线试玩、一键下载、交流频道入口。发布页本身也有自动化测试盯着，链接和资源不会失联。</p>
+              </div>
+            </li>
+            <li>
+              <span class="tl-ver">v2.7</span>
+              <div class="tl-body">
+                <h3>给玩家推送更新</h3>
+                <p>一个固定地址上的更新清单，客户端启动时问一句。默认不发任何网络请求（离线优先），配了地址才启用；坏了就什么都不做，绝不挡住游戏。</p>
+              </div>
+            </li>
+            <li>
+              <span class="tl-ver">v2.6</span>
+              <div class="tl-body">
+                <h3>热更新 + 志愿填报 + 因果链</h3>
+                <p>导入 JSON 就有新内容；高考之后的六个志愿；8 条因果链会决定毕业去向。</p>
+              </div>
+            </li>
+            <li>
+              <span class="tl-ver">v2.5</span>
+              <div class="tl-body">
+                <h3>自定义人物</h3>
+                <p>外号、头像、性格、缺陷、属性点自由分配、9 套角色模板、自定义难度 8 根滑杆。</p>
+              </div>
+            </li>
+            <li>
+              <span class="tl-ver">v2.x</span>
+              <div class="tl-body">
+                <h3>基础系统</h3>
+                <p>3+1+2 选科、11 种天赋、4 种家庭背景、9 个高考目标、37 种行动、95 个随机事件、7 条剧情线 36 章、29 个结局、79 个成就。</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- ---------- FAQ ---------- -->
+      <section class="section" id="faq">
+        <div class="wrap">
+          <h2 class="section-title">常见问题</h2>
+          <p class="section-sub">先看这里，能省下在频道里问一遍的时间。</p>
+
+          <div class="faq">
+            <details>
+              <summary>要花钱吗？要注册吗？会收集我的数据吗？</summary>
+              <p>
+                都不要。免费、无账号、无广告、无内购；存档只写在你自己的浏览器或手机里，游戏本身不联网（除非你自己配置了更新地址）。
+              </p>
+            </details>
+
+            <details>
+              <summary>需要联网吗？</summary>
+              <p>
+                不需要。网页版首次打开后可以「添加到主屏幕」离线玩；安卓版装完就能断网玩。
+                只有 v2.7 的更新检查需要网络，而且<strong>默认是关闭的</strong>。
+              </p>
+            </details>
+
+            <details>
+              <summary>手机上怎么装 APK？</summary>
+              <p>
+                点「下载 APK」→ 打开文件 → 系统会提示「未知来源应用」，允许安装即可。
+                这个包用的是调试签名（个人项目，没买代码签名证书），所以会有提示，但功能完全正常。
+              </p>
+            </details>
+
+            <details>
+              <summary>游戏里的学校和分数线是真的吗？</summary>
+              <p>
+                全部为<strong>虚构娱乐内容</strong>，与马鞍山市第二中学及任何真实学校、机构、个人无关。
+                录取档次参考了常见口径，但数值是为游戏性设定的。
+              </p>
+            </details>
+
+            <details>
+              <summary>一局要玩多久？</summary>
+              <p>
+                三年 36 周、每周两段，一路点完大约 10～20 分钟；可以随时存档、导出角色卡。
+                嫌长可以在开局把每学期周数调短，或者用自由模式自己决定什么时候高考。
+              </p>
+            </details>
+
+            <details>
+              <summary>为什么我熬夜刷题反而考得更差？</summary>
+              <p>
+                这是故意的：疲劳超过 45 之后学习效率会往下掉，知识收益还会边际递减。
+                心情和疲劳比「多刷一套卷子」更影响分数——先睡一觉再学经常更划算。
+              </p>
+            </details>
+
+            <details>
+              <summary>可以调难度 / 作弊吗？</summary>
+              <p>
+                自定义难度有 8 根滑杆（成长、遗忘、开局底子、零花钱、事件频率、考试波动、属性点、偏科），
+                开局还有 5 个缺陷可以换属性点。想轻松玩就调，没人管你。
+              </p>
+            </details>
+
+            <details>
+              <summary>内容会继续更新吗？</summary>
+              <p>
+                会。新事件、新道具、平衡调整可以通过<strong>热更新内容包</strong>推送，不用重新装 APK；
+                只有引擎规则变化才需要出新包。更新消息会发在下面的腾讯频道里。
+              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- 交流 ---------- -->
+      <section class="section community-section" id="community">
+        <div class="wrap">
+          <div class="community">
+            <div class="community-text">
+              <h2>💬 加入腾讯频道【模拟器发布页】</h2>
+              <p>
+                新版本发布、内容包、玩法讨论、报 bug 都在这里。遇到问题直接说，
+                顺手提一句「哪一届、什么难度、哪一步卡住了」，比截图问一句「为什么」有用得多。
+              </p>
+              <p class="community-actions">
+                <a
+                  class="btn btn-channel btn-lg"
+                  href="https://pd.qq.com/s/c38ht6k4r"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >点击链接加入腾讯频道</a
+                >
+                <button type="button" class="btn btn-ghost btn-lg" data-copy-link="https://pd.qq.com/s/c38ht6k4r">
+                  复制频道链接
+                </button>
+              </p>
+              <p class="community-url"><code>https://pd.qq.com/s/c38ht6k4r</code></p>
+            </div>
+            <p class="community-card" aria-hidden="true">
+              <span class="cc-title">模拟器发布页</span>
+              <span class="cc-sub">版本发布 · 内容包 · 反馈</span>
+              <span class="cc-qr">腾讯频道</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- 关于我们 ---------- -->
+      <section class="section" id="about">
+        <div class="wrap">
+          <h2 class="section-title">关于我们</h2>
+
+          <div class="about">
+            <div class="about-main">
+              <p>
+                马鞍山二中模拟器是一个<strong>个人独立项目</strong>：一个人写引擎、写文案、写界面，
+                用 Node.js + 原生 HTML/CSS/JS 做成——没有前端框架、没有后端服务、没有运行时依赖。
+              </p>
+              <p>
+                整个游戏只有一份纯逻辑引擎，被终端版、网页版、桌面客户端和安卓 APK 四端共用；
+                目前有 300 多个自动化测试盯着这条链路（包括解包 APK、把里面的引擎拿出来真打一局）。
+              </p>
+              <ul class="about-list">
+                <li><span>项目性质</span>非商业、个人爱好作品，MIT 许可</li>
+                <li><span>运行环境</span>浏览器 / 安卓 5.0+ / Windows 桌面 / Node.js 18+</li>
+                <li><span>隐私</span>不收集任何数据，不联网，不做统计与广告</li>
+                <li><span>内容声明</span>纯属虚构娱乐，与任何真实学校、机构、个人无关</li>
+              </ul>
+            </div>
+
+            <aside class="about-side">
+              <div class="sponsor">
+                <p class="sponsor-label">赞助商</p>
+                <p class="sponsor-name">印显元（爸爸）</p>
+                <p class="sponsor-note">感谢出资支持这个项目，也感谢每一位在频道里提意见的玩家。</p>
+              </div>
+              <div class="thanks">
+                <p class="sponsor-label">致谢</p>
+                <p>每一位试玩、报 bug、写反馈的朋友。</p>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="wrap footer-inner">
+        <div class="footer-brand">
+          <span class="nav-mark" aria-hidden="true">贰中</span>
+          <div>
+            <p class="footer-title">马鞍山二中模拟器</p>
+            <p class="footer-sub">
+              <span data-version-badge>v2.8.0</span> · 厚德 · 励学 · 敦行
+            </p>
+          </div>
+        </div>
+        <nav class="footer-links" aria-label="页脚导航">
+          <a href="./play/index.html">在线试玩</a>
+          <a href="#download">下载</a>
+          <a href="#faq">常见问题</a>
+          <a href="#about">关于我们</a>
+          <a href="https://pd.qq.com/s/c38ht6k4r" target="_blank" rel="noopener noreferrer">腾讯频道</a>
+        </nav>
+      </div>
+      <div class="wrap footer-note">
+        <p>
+          ⚠️ 本模拟器中的事件、人物、分数线和结局<strong>全部为虚构娱乐内容</strong>，与马鞍山市第二中学及任何真实学校、机构、个人无关。
+        </p>
+        <p>MIT Licensed · 非商业个人项目 · <span data-year>2026</span></p>
+      </div>
+    </footer>
+
+    <!-- 截图放大 -->
+    <div class="lightbox" id="lightbox" hidden>
+      <button type="button" class="lightbox-close" id="lightbox-close" aria-label="关闭（Esc）">✕</button>
+      <p class="lightbox-title" id="lightbox-title"></p>
+      <img class="lightbox-img" id="lightbox-img" alt="" />
+    </div>
+
+    <p class="toast" id="toast" role="status" aria-live="polite" hidden></p>
+  </body>
+</html>

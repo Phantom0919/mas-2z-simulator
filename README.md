@@ -1,15 +1,28 @@
-# 马鞍山二中模拟器 · v2.7
+# 马鞍山二中模拟器 · v2.8
 
 一个**零依赖的 Node.js 高中生活模拟器**。你是马鞍山二中的高一新生，三年、六个学期、36 个星期，
 每个星期要在一堆选择里活下来：主行动 + 周末安排，一共 **72 次决策**；高考之后还有最后一关——**填志愿**。
 
 同时提供 **终端版（CLI）**、**网页版（Web UI）**、**桌面客户端**和**安卓 APK**，共用同一份纯逻辑引擎。
+`docs/` 目录是一个可以直接扔到 GitHub Pages 的**官方发布页**：在线试玩 + 一键下载 + 交流频道入口。
 
 > 🎮 玩法与数值变化见 [CHANGELOG.md](./CHANGELOG.md)。
 > 🗺️ 下一步做什么、以及这个项目是怎么分工的，见 [ROADMAP.md](./ROADMAP.md)。
 > ⚠️ 本模拟器中的事件、人物、分数线和结局**全部为虚构娱乐内容**，与马鞍山市第二中学及任何真实学校、机构无关。
 
 ---
+
+## v2.8 新增了什么
+
+| 系统 | 内容 |
+| --- | --- |
+| 🌐 **官方发布页** | `docs/` 就是一个纯静态站点（零外链、断网能开）：首屏一句话定位 + 六个数字，往下是卖点卡、七张真实截图、三种打开方式、版本时间线、常见问题、交流入口、关于我们 |
+| 🎮 **在线试玩** | `docs/play/` 是网页版副本、`docs/src/` 是按 import 图收集的引擎模块——**分享一个链接就能开局**，不用先下载 0.5 MB |
+| 💬 **交流入口** | 腾讯频道【模拟器发布页】固定在首屏 / 正文 / 页脚，另配「复制频道链接」按钮 |
+| 🧾 **关于我们** | 个人独立项目说明、赞助商、虚构内容声明与许可 |
+| 🎨 **素材流水线** | `tools/build-pages-shots.py`：验收截图转 JPEG（1558 KB → 489 KB，省 69%）+ 生成 1200×630 的 OG 分享图 |
+| 📦 **打包 / 预览** | `tools/build-pages.mjs` 一次同步试玩副本 + APK + 推送源 + 可直接上传的 zip；`tools/serve-pages.mjs` 本地预览（手机也能连上来试） |
+| 🔍 **守门测试** | `test/pages.test.js` 19 条：链接不许死、副本逐字节一致、真起 HTTP 验 MIME、假 DOM 里点一遍交互 |
 
 ## v2.7 新增了什么
 
@@ -75,9 +88,11 @@ cd mas-2z-simulator
 
 npm start            # 终端版：进入开局向导（选科 / 天赋 / 背景 / 目标）
 npm run web          # 网页版：http://127.0.0.1:3210
-npm test             # 跑测试（引擎 + 服务端 + 前端）
+npm test             # 跑测试（引擎 + 服务端 + 前端 + 发布页，310 条）
 npm run sim          # 数值平衡报告（9 种策略批量跑）
 npm run gallery      # 查看结局图鉴与历史战绩
+npm run pages        # 生成 / 更新官方发布页（docs/）
+npm run pages:serve  # 本地预览发布页：http://127.0.0.1:8080
 ```
 
 ### 终端版常用命令
@@ -127,6 +142,30 @@ node src/server.js --port 8080
 主行动/周末阶段切换、商店、NPC 好感面板、**🌳 人物关系树状图**、
 **📜 七条剧情线的进度与回顾**、**📋 高考志愿填报界面**、**🔄 内容包（热更新）面板**、
 结局图鉴（存在浏览器 localStorage），并支持存档导出 / 导入。
+
+### 官方发布页（GitHub Pages，v2.8）
+
+`docs/` 就是一个**可以直接发布的静态站点**：首屏讲清这个游戏是什么、七张真实截图、
+三种打开方式、版本时间线、常见问题、腾讯频道入口和「关于我们」。
+它没有任何外链（没有 CDN / 字体 / 统计脚本），所以墙内能开、断网也能开。
+
+```bash
+python tools/build-pages-shots.py   # ① 界面改过之后：把 shots/ 的验收截图压成 JPEG + 生成分享图
+node tools/build-pages.mjs          # ② 每次发版：同步在线试玩副本 + APK + 推送源 + 可上传的 zip
+node tools/serve-pages.mjs          # ③ 上传前先在本地看一遍（默认 8080，手机也能连）
+```
+
+- **在线试玩**：`docs/play/` 是 `web/` 的副本，`docs/src/` 是按 import 图自动收集的引擎模块
+  （和 APK 用的是同一套 `tools/module-graph.mjs`）。所以**分享一个链接就能开局**，
+  不用先下载 0.5 MB 再"允许未知来源"。副本由测试盯着和 `web/` 逐字节一致。
+- **页面上的数字不手写**：APK 的版本 / 体积 / SHA-256 由 `tools/build-pages.mjs` 从真实产物算出来，
+  写进 `docs/download/latest.json`，页面加载后填进去。
+- **上传**：把 `docs/` 推到仓库（`main` 分支）→ Settings → Pages → Source 选
+  "Deploy from a branch"、目录选 `/docs`；或者直接用生成的
+  `dist/马鞍山二中模拟器-<版本>-发布页.zip`（解压后就是站点根目录）。
+  手写文件（`index.html` / `assets/style.css` / `assets/site.js`）不会被构建脚本覆盖。
+- **顺带的收益**：GitHub Pages 自带 CORS 头，所以 `docs/content/` 里的
+  `update-manifest.json` + 内容包可以**直接当 v2.7 的推送源**（手机上的离线版也能直拉）。
 
 ### 热更新：怎么把新内容装上
 
@@ -614,6 +653,13 @@ run_class:    { grade: [1], note: '班干部竞选只在高一' },
 │       └── res/                       # 应用名、主题（含刘海屏适配）、多密度图标
 ├── desktop/
 │   └── installer.nsi     # NSIS 安装包脚本（模板，占位符由编译脚本替换）
+├── docs/                 # 官方发布页（GitHub Pages 直接托管这个目录）
+│   ├── index.html        # 手写：首屏 / 卖点 / 截图 / 下载 / 更新 / FAQ / 交流 / 关于我们
+│   ├── assets/           # 手写 style.css + site.js；生成 shots/*.jpg、og.jpg、icon-192.png
+│   ├── play/             # 生成：web/ 的副本（在线试玩）
+│   ├── src/              # 生成：按 import 图收集的引擎模块（供 play/ 用）
+│   ├── download/         # 生成：APK（固定文件名）+ latest.json（版本 / 体积 / SHA-256）
+│   └── content/          # 生成：更新清单 + 内容包（Pages 自带 CORS，可直接当推送源）
 ├── tools/
 │   ├── sim.js            # 数值平衡 / 批量模拟（正式报告）
 │   ├── tune.mjs          # 扫参数调难度：node tools/tune.mjs --knob gainScale --from 0.7 --to 0.9
@@ -622,9 +668,12 @@ run_class:    { grade: [1], note: '班干部竞选只在高一' },
 │   ├── check-events6.mjs # 因果链自检：链图 / 日历 / 撞名 / 315 个选项与全部 risk 分支
 │   ├── build-content-pack.mjs  # 从真实源码生成内容包快照 / 规范化 / --diff 对比
 │   ├── make-icon.py      # 生成桌面 / 网页 / 安卓三套图标
-│   ├── module-graph.mjs  # 顺着 import 收集浏览器要用的模块（打包与测试共用同一份逻辑）
+│   ├── module-graph.mjs  # 顺着 import 收集浏览器要用的模块（APK / 发布页 / 测试共用同一份逻辑）
 │   ├── preview-relations.mjs  # 把关系树 SVG / 故事线 HTML 落到 build/preview 供人眼检查
 │   ├── svg-preview.py    # 用 Pillow 把关系树 SVG 画成 PNG（没有浏览器时看排版用）
+│   ├── build-pages.mjs   # 生成发布页：试玩副本 + APK + 推送源 + 可上传的 zip（零依赖写法）
+│   ├── build-pages-shots.py  # 截图转 JPEG + 生成 OG 分享图（需要 Pillow）
+│   ├── serve-pages.mjs   # 本地预览发布页（正确 MIME、APK 可下载、手机可连）
 │   ├── android-sdk.mjs   # 一键装 Android SDK（不需要 Android Studio / Gradle）
 │   ├── build-apk.mjs     # 免 Gradle 直接出 APK（aapt2 + javac + d8 + zipalign + apksigner）
 │   ├── build-desktop.mjs # 免 electron-builder 出 Windows 便携版（复用 Electron 运行时 + 压缩）
@@ -642,14 +691,18 @@ run_class:    { grade: [1], note: '班干部竞选只在高一' },
     ├── content.test.js   # 59 个内容包测试（校验 / 合并 / 校验和 / 打包脚本 / 两个真实包可玩性）
     ├── volunteer.test.js # 28 个 v2.6 测试（志愿全流程 / 存档往返 / 自动填表 / 特殊路线 /
     │                     #   毕业去向 / 因果链 / 内容包在引擎侧的原地改写与回滚）
-    └── update.test.js    # 21 个 v2.7 推送测试（清单校验 / 决策矩阵 / 地址护栏 / 端到端"拉清单→装包→已是最新" /
-                          #   离线模式 / 示例清单与包的防漂移守门）
+    ├── update.test.js    # 21 个 v2.7 推送测试（清单校验 / 决策矩阵 / 地址护栏 / 端到端"拉清单→装包→已是最新" /
+    │                     #   离线模式 / 示例清单与包的防漂移守门）
+    └── pages.test.js     # 19 个 v2.8 发布页测试（本地链接 / 零外链 / 与 web 逐字节一致 / 真起 HTTP 验 MIME /
+                          #   在线试玩真打一局 / 假 DOM 点一遍放大与复制 / 体积预算 / 无 BOM）
 ```
 
-一共 **291 个测试**，`npm test` 全部通过（成品包的布局检查在没有产物时会自动跳过）。
+一共 **310 个测试**，`npm test` 全部通过（成品包的布局检查在没有产物时会自动跳过）。
 其中最有用的一个是 `android.test.js` 的最后一条：它把打好的 APK **解包**，
 直接 import 里面那份 `local-api.js` 打一局（含高考后的志愿填报）—— 只要 APK 少打包了任何一个模块，
 测试就会红，而不是等用户装到手机上看到白屏。
+`pages.test.js` 用了同一招：直接 import `docs/play/` 那份引擎打几个回合，
+所以"在线试玩"这个入口不会在发版后悄悄坏掉。
 
 游戏本体（CLI + 网页 + 引擎）**零运行时依赖**；Electron、NSIS 与 Android SDK 都只在你真正要打包时才需要。
 
@@ -693,7 +746,8 @@ index.html?demo=6&preset=olympiad&nickname=闪电&flaw=frail&points=intelligence
 
 | 产物 | 命令 | 大小 | 用途 |
 | --- | --- | --- | --- |
-| `dist/马鞍山二中模拟器-2.7.0-debug.apk` | `npm run apk` | 0.46 MB | 安卓侧载包（含热更新 + 推送入口） |
+| `dist/马鞍山二中模拟器-2.8.0-debug.apk` | `npm run apk` | 0.46 MB | 安卓侧载包（含热更新 + 推送入口） |
+| `dist/马鞍山二中模拟器-2.8.0-发布页.zip` | `npm run pages` | 1.4 MB | 官方发布页：解压后推到 GitHub Pages（含在线试玩 + APK） |
 | `dist/desktop/…-安装版.exe` | `npm run installer` | 78 MB | Windows：双击安装，带向导/快捷方式/卸载 |
 | `dist/desktop/…-win-x64.zip` | `npm run desktop:portable` | 110 MB | Windows：免安装绿色版，解压即玩 |
 
@@ -787,9 +841,10 @@ v2.1 的存档里没有人物阵容和剧情记录，读进来会按种子把同
   代词用 `${cast.deskmate.ta}`，**不要写死"张昊""王老师"**——那些名字每局都不一样
   （而且玩家可以自己给同桌起名，写死了就会串戏）。
   `week` 是"第几周之后才能触发"，一条线里要保持递增。
-- **调平衡之外别忘的两件事**：`node --test test/`（291 个测试，包含剧情结构、姓名生成、
-  自制人物、内容包与事件日历的守门测试）和 `node tools/preview-relations.mjs` + `python tools/svg-preview.py`
-  （不用开浏览器就能看关系树排版）。
+- **调平衡之外别忘的三件事**：`npm test`（310 个测试，包含剧情结构、姓名生成、
+  自制人物、内容包、事件日历，以及发布页的链接 / 素材 / 交互守门测试）、
+  `python tools/build-pages-shots.py && node tools/build-pages.mjs`（界面改过之后重出发布页素材与产物）、
+  `node tools/preview-relations.mjs` + `python tools/svg-preview.py`（不用开浏览器就能看关系树排版）。
 - **不知道该做什么的时候**：翻 [ROADMAP.md](./ROADMAP.md)，那里按 P0/P1/P2 排了短期 / 中期 / 长期建议，
   每条都带工作量和验收标准。
 

@@ -1,0 +1,168 @@
+{
+  "format": 1,
+  "meta": {
+    "name": "官方焕新内容包",
+    "version": "2.6.1",
+    "author": "马鞍山二中模拟器",
+    "note": "热更新演示包：2 个全新事件 + 1 个新道具 + 2 处平衡调整（导入即生效，不用重装）"
+  },
+  "requires": {
+    "app": ">=2.6.0"
+  },
+  "events": [
+    {
+      "id": "pack_rain_library",
+      "name": "雨夜图书馆",
+      "icon": "🌧️",
+      "kind": "choice",
+      "weight": 9,
+      "text": "晚自习最后一节，雨突然下大了。图书馆的喇叭在念闭馆通知，你借的三本书还摊在桌上——管理员站在门口，手里拿着伞，看样子也在等雨停。",
+      "choices": [
+        {
+          "id": "carry",
+          "label": "陪管理员把书搬上二楼，等雨小一点",
+          "hint": "老师好感 +，但回宿舍会很晚",
+          "outcome": "你抱着两摞书来回跑了四趟，管理员阿姨最后把值班室的热水递给你：\"下次别学这么晚。\"雨小下来的时候，你踩着水洼回宿舍，楼管差点把你锁在门外。",
+          "effect": {
+            "npc": {
+              "head": 3
+            },
+            "stats": {
+              "comprehensive": 2,
+              "fatigue": 3,
+              "mood": 1,
+              "teacherFavor": 3
+            }
+          }
+        },
+        {
+          "id": "finish",
+          "label": "把最后两道题做完再走",
+          "hint": "学习 +，状态 -",
+          "outcome": "你在空荡荡的自习室里把那两道导数题啃完，抬头时整栋楼只剩这一间还亮着。雨还在下，你借了管理员的伞。",
+          "effect": {
+            "knowledge": {
+              "all": 1.6,
+              "math": 2.4
+            },
+            "npc": {
+              "math": 1.5
+            },
+            "stats": {
+              "fatigue": 3.5,
+              "mood": -1.5
+            }
+          }
+        },
+        {
+          "id": "dash",
+          "label": "把书塞进书包，冒雨冲回宿舍",
+          "hint": "快到爽，但容易撞见不该撞见的人",
+          "outcome": "你顶着书包冲进雨里，十分钟的路程跑成了八分钟。宿舍楼门口，你浑身滴水地撞见正在查寝的班主任。",
+          "effect": {
+            "knowledge": {
+              "all": -0.4
+            },
+            "stats": {
+              "discipline": 3,
+              "fatigue": 4,
+              "mood": 2,
+              "physique": 1.5,
+              "teacherFavor": -2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "pack_winter_relay",
+      "name": "冬季长跑接力",
+      "icon": "🎽",
+      "kind": "choice",
+      "weight": 10,
+      "text": "十二月的风从操场那头刮过来，体育委员举着报名表站在你桌前：\"还差最后一棒。\"名单上已经有六个名字，都是平时跑操从不掉队的那种。",
+      "choices": [
+        {
+          "id": "anchor",
+          "label": "接最后一棒，赌上这次月考的排名",
+          "hint": "体质 +，但会很累",
+          "outcome": "最后一棒交到你手上时，你们班排第三。你咬着牙追过了隔壁班那个短跑特长生，冲线时腿抖得站不住——班里有人把你举了起来。",
+          "effect": {
+            "npc": {
+              "deskmate": 3,
+              "friend": 3
+            },
+            "stats": {
+              "comprehensive": 1,
+              "fatigue": 8,
+              "mood": 4,
+              "physique": 5,
+              "social": 3
+            }
+          }
+        },
+        {
+          "id": "logistics",
+          "label": "不进名单，负责递水、记圈、喊人",
+          "hint": "社交 +，老师好感 +",
+          "outcome": "你抱着记分板跑遍了操场四个角，把每个人的圈数喊得清清楚楚。比赛结束，体育委员把最后一块巧克力分给了你。",
+          "effect": {
+            "npc": {
+              "friend": 2,
+              "head": 2
+            },
+            "stats": {
+              "fatigue": 2,
+              "mood": 3,
+              "social": 4,
+              "teacherFavor": 2
+            }
+          }
+        },
+        {
+          "id": "pass_on",
+          "label": "把报名表往下传，假装没听见",
+          "hint": "轻松，但会被人记住",
+          "outcome": "报名表在你手里停了不到两秒就传到了后排。第二天跑操，体育委员从你身边跑过时没说话——你俩都知道那两秒发生了什么。",
+          "effect": {
+            "npc": {
+              "deskmate": -3
+            },
+            "stats": {
+              "discipline": 2,
+              "mood": 2,
+              "social": -2
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "thermos",
+      "name": "保温杯（枸杞版）",
+      "icon": "🍵",
+      "price": 260,
+      "desc": "每周额外恢复 1 点疲劳，学习收益 +3%（班主任看了会点头）",
+      "mods": {
+        "study": 0.03,
+        "weeklyRecovery": 1
+      }
+    }
+  ],
+  "traits": [],
+  "personalities": [],
+  "flaws": [],
+  "actions": [],
+  "balance": {
+    "eff": {
+      "gainScale": 0.82
+    },
+    "difficulty": {
+      "normal": {
+        "forgetScale": 0.95
+      }
+    }
+  }
+}

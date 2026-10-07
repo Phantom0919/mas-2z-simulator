@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "version": "2.8.0",
+  "file": "马鞍山二中模拟器-安卓版.apk",
+  "url": "./download/马鞍山二中模拟器-安卓版.apk",
+  "bytes": 486589,
+  "sha256": "df20919ace1bde9a91eb2063df1549bb3785a6eaf7911aac655769085b0f10ff",
+  "builtAt": "2026-10-07T10:37:59.528Z",
+  "note": "debug 签名，安装时系统会提示「未知来源应用」，功能不受影响。"
+}

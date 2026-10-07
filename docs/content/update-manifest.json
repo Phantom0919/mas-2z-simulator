@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "channel": "stable",
+  "latest": {
+    "version": "2.6.1",
+    "name": "官方焕新内容包",
+    "url": "official-pack.json",
+    "checksum": "51333b01",
+    "notes": "秋季内容包：雨夜图书馆、冬季长跑接力、保温杯（枸杞版），外加两处平衡调整",
+    "releasedAt": "2026-10-01",
+    "requires": {
+      "app": ">=2.6.0"
+    },
+    "auto": false,
+    "mandatory": false
+  },
+  "note": "GitHub Pages 自带 CORS 头，所以手机上的离线版也能直接从这个地址检查更新。"
+}

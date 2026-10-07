@@ -1,5 +1,5 @@
 /**
- * 引擎单元测试（v2）：node --test test/
+ * 引擎单元测试（v2）：npm test
  */
 
 import assert from 'node:assert/strict';
