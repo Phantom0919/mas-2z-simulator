@@ -76,6 +76,16 @@ CHECKS = [
     ("assets/www/index.html", 'id="update-banner"', None),
     ("assets/www/local-api.js", "runUpdateCheckInPage", None),
     ("assets/www/content/update-endpoint.json", '"manifest": ""', None),
+    # v2.9：游戏内的交流入口 / 关于我们（赞助商）必须一起进包
+    ("assets/www/index.html", 'id="community-modal"', None),
+    ("assets/www/index.html", "印显元（爸爸）", None),
+    ("assets/www/index.html", "https://pd.qq.com/s/c38ht6k4r", None),
+    ("assets/www/index.html", 'id="btn-community"', None),
+    ("assets/www/index.html", 'id="btn-ending-share"', None),
+    ("assets/www/app.js", "COMMUNITY_URL", None),
+    ("assets/www/app.js", "openCommunityModal", None),
+    ("assets/www/app.js", "execCommand('copy')", None),
+    ("assets/www/style.css", ".community-block", None),
 ]
 
 

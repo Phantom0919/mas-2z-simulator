@@ -296,6 +296,67 @@ button.big {
   font-size: 16px;
 }
 
+/*
+ * 链接当按钮用。
+ *
+ * 「加入腾讯频道」必须是 <a>：浏览器里要能新开标签页、桌面端要能交给系统浏览器
+ * （electron/main.cjs 的 will-navigate / setWindowOpenHandler 会接住），
+ * 安卓端要能跳出 WebView 交给 QQ 或浏览器（MainActivity 的 shouldOverrideUrlLoading）。
+ * 但外观得和旁边的按钮一模一样，所以这里把 button.primary / button.ghost / button.big
+ * 的样式镜像过来——只镜像这三条，别把整个 button 选择器搬过来。
+ */
+a.primary,
+a.ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 8px 14px;
+  transition:
+    transform 0.12s var(--ease),
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+a.primary {
+  background: linear-gradient(180deg, #2f81f7, #1f6feb);
+  border-color: #388bfd;
+  color: #fff;
+  font-weight: 600;
+}
+
+a.primary:hover {
+  border-color: #58a6ff;
+  background: linear-gradient(180deg, #4493f8, #2f81f7);
+  box-shadow: 0 6px 18px rgba(47, 129, 247, 0.35);
+  transform: translateY(-1px);
+}
+
+a.ghost {
+  background: transparent;
+  color: var(--muted);
+}
+
+a.ghost:hover {
+  color: var(--text);
+  background-color: rgba(88, 166, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+a.big {
+  padding: 12px 22px;
+  font-size: 16px;
+}
+
 /* ---------- 顶栏 ---------- */
 
 .topbar {
@@ -1210,6 +1271,101 @@ button,
   gap: 10px;
   margin-top: 18px;
   flex-wrap: wrap;
+}
+
+/* ---------- 交流 / 关于我们（开局那一屏 + 交流面板） ---------- */
+
+.start-community {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 10px;
+  align-items: center;
+}
+
+/* 长得像链接、点起来像按钮——所以键盘也能聚焦（见上面的 :focus-visible 规则） */
+.ghost-link {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--brand-2);
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(88, 166, 255, 0.4);
+  text-underline-offset: 3px;
+  border-radius: 4px;
+}
+
+.ghost-link:hover:not(:disabled) {
+  color: #79c0ff;
+  background: none;
+  box-shadow: none;
+  transform: none;
+}
+
+.community-block + .community-block {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.community-url code {
+  overflow-wrap: anywhere;
+}
+
+.about-facts {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.about-facts li {
+  font-size: 13px;
+  color: var(--muted);
+  background: rgba(15, 21, 29, 0.55);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.about-facts span {
+  display: inline-block;
+  min-width: 72px;
+  opacity: 0.72;
+}
+
+/* 赞助商：整张卡片给一点暖色，别做得像广告，就是把名字挂在那儿 */
+.sponsor-box {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(224, 165, 58, 0.4);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(224, 165, 58, 0.09), transparent);
+}
+
+.sponsor-label {
+  margin: 0 0 4px;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--warn);
+}
+
+.sponsor-name {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.ending-community {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
 }
 
 /* ---------- 自定义人物（开局构筑） ---------- */

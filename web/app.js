@@ -13,6 +13,7 @@
  */
 
 import { createLocalApi } from './local-api.js';
+import { GAME_VERSION } from '../src/engine.js';
 import { summarizeUpdate } from '../src/update.js';
 import {
   castCardHtml,
@@ -31,6 +32,15 @@ const CARD_KEY = 'mas2z-cards-v1';
 const TRAIT_PICK = 2;
 /** 缺陷最多 1 个（与引擎 EFF.maxFlaws 一致）。 */
 const MAX_FLAWS = 1;
+/**
+ * 腾讯频道【模拟器发布页】。
+ *
+ * 只在这里写一次，HTML 里的链接、复制按钮、分享文案全用它。
+ * 它是真链接（不是按钮）：浏览器新开标签页、桌面端交给系统浏览器
+ * （electron/main.cjs）、安卓端跳出 WebView（MainActivity.shouldOverrideUrlLoading）。
+ * 在网页上玩的人也就多了，所以这个地址必须能被复制出去。
+ */
+const COMMUNITY_URL = 'https://pd.qq.com/s/c38ht6k4r';
 
 const state = {
   gameId: null,
@@ -164,6 +174,77 @@ function showTurnLines(lines) {
   node.scrollTop = 0;
   clearTimeout(state.linesTimer);
   state.linesTimer = setTimeout(() => node.classList.add('hidden'), 9000);
+}
+
+/* -------------------------------------------------------- 交流 / 关于 */
+
+/**
+ * 复制文本：先走剪贴板 API，失败再退回 textarea + execCommand。
+ *
+ * 安卓 WebView 里 navigator.clipboard 会因为权限或"用户手势"判定失败，
+ * 而「复制频道链接」正是这个面板最不该出的错——复制不到，玩家就只能手打地址。
+ */
+async function copyText(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // 落到下面的兜底
+  }
+  try {
+    const helper = document.createElement('textarea');
+    helper.value = text;
+    helper.setAttribute('readonly', '');
+    helper.style.position = 'fixed';
+    helper.style.opacity = '0';
+    document.body.appendChild(helper);
+    helper.select();
+    const ok = document.execCommand('copy');
+    helper.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+/** 把链接和版本号对齐到常量：HTML 里手写的那份只是"没有 JS 时也能点"。 */
+function syncCommunityLinks() {
+  for (const link of document.querySelectorAll('[data-community-link]')) link.href = COMMUNITY_URL;
+  const url = $('community-url');
+  if (url) url.textContent = COMMUNITY_URL;
+  const version = $('community-version');
+  if (version) version.textContent = `v${GAME_VERSION}`;
+}
+
+/** 推荐文案（不是给玩家看的，是给他粘到群里 / 频道里的）。 */
+function communityShareText() {
+  return [
+    `我在玩《马鞍山二中模拟器》v${GAME_VERSION}：三年、六个学期、72 次抉择，`,
+    '37 种行动、95 个随机事件、29 个结局，高考之后还要自己填六个志愿。',
+    `腾讯频道【模拟器发布页】：${COMMUNITY_URL}`,
+  ].join('');
+}
+
+/** 结局分享文案：带上这一局的成绩，比干巴巴推荐一句有用得多。 */
+function endingShareText() {
+  const ending = state.view?.ending;
+  if (!ending) return communityShareText();
+  const bits = [];
+  if (ending.total) bits.push(`高考 ${ending.total} / 750`);
+  if (ending.rank) bits.push(`年级第 ${ending.rank} 名`);
+  if (ending.achievements?.length) bits.push(`${ending.achievements.length} 个成就`);
+  return [
+    `我在《马鞍山二中模拟器》v${GAME_VERSION} 里打出了「${ending.title}」`,
+    bits.length > 0 ? `（${bits.join('，')}）` : '',
+    `。腾讯频道【模拟器发布页】：${COMMUNITY_URL}`,
+  ].join('');
+}
+
+function openCommunityModal() {
+  syncCommunityLinks();
+  $('community-modal').classList.remove('hidden');
 }
 
 /* ------------------------------------------------------------ 请求包装 */
@@ -1249,6 +1330,7 @@ function closeModals() {
   $('event-modal').classList.add('hidden');
   $('relations-modal').classList.add('hidden');
   $('story-modal').classList.add('hidden');
+  $('community-modal').classList.add('hidden');
 }
 
 /**
@@ -1258,6 +1340,7 @@ function closeModals() {
 function hideRunModals() {
   $('volunteer-modal').classList.add('hidden');
   $('content-modal').classList.add('hidden');
+  $('community-modal').classList.add('hidden');
 }
 
 function openEventModal(pending) {
@@ -2209,6 +2292,11 @@ function renderEnding(ending) {
         .map((item) => `<div class="achievement">${item.icon} ${escapeHtml(item.name)}<span>${escapeHtml(item.desc)}</span></div>`)
         .join('') || '<p class="muted">这一局什么都没留下，除了三年。</p>'
     }</div>
+    <p class="ending-community">
+      📣 喜欢这一局？点上面的「分享这一局」可以把成绩复制走，粘给同学就行；
+      也欢迎来腾讯频道【模拟器发布页】聊聊：
+      <a href="${escapeHtml(COMMUNITY_URL)}" target="_blank" rel="noopener noreferrer">${escapeHtml(COMMUNITY_URL)}</a>
+    </p>
   `;
   $('ending-modal').classList.remove('hidden');
 }
@@ -2439,6 +2527,23 @@ function bind() {
   $('btn-start-gallery').addEventListener('click', openGalleryModal);
   $('btn-ending-gallery').addEventListener('click', openGalleryModal);
   $('btn-gallery-close').addEventListener('click', () => $('gallery-modal').classList.add('hidden'));
+
+  // 交流 / 关于：顶栏和开局那一屏都能打开同一个面板
+  $('btn-community').addEventListener('click', openCommunityModal);
+  $('btn-about-start').addEventListener('click', openCommunityModal);
+  $('btn-community-close').addEventListener('click', () => $('community-modal').classList.add('hidden'));
+  $('btn-community-copy').addEventListener('click', async () => {
+    const ok = await copyText(COMMUNITY_URL);
+    toast(ok ? '频道链接已复制，粘给同学就能进来。' : `复制失败，链接是 ${COMMUNITY_URL}`);
+  });
+  $('btn-community-share').addEventListener('click', async () => {
+    const ok = await copyText(communityShareText());
+    toast(ok ? '推荐文案已复制，粘到群里就行。' : `复制失败，链接是 ${COMMUNITY_URL}`);
+  });
+  $('btn-ending-share').addEventListener('click', async () => {
+    const ok = await copyText(endingShareText());
+    toast(ok ? '这一局的成绩已复制，去频道或群里晒一晒。' : `复制失败，链接是 ${COMMUNITY_URL}`);
+  });
   $('btn-gallery-reset').addEventListener('click', () => {
     saveProfile(emptyProfile());
     renderGallery();
@@ -2551,6 +2656,7 @@ async function maybeAutoStart() {
 
 async function main() {
   bind();
+  syncCommunityLinks();
   const mode = await detectApiMode();
   showModeBadge(mode);
   try {

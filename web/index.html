@@ -71,6 +71,7 @@
         <button id="btn-shop" class="ghost" title="零花钱怎么花">🛒 商店</button>
         <button id="btn-gallery" class="ghost" title="跨局收集的结局图鉴">📖 图鉴</button>
         <button id="btn-content" class="ghost" title="导入内容包：加事件、加道具、调平衡，不用重装">🔄 内容包</button>
+        <button id="btn-community" class="ghost" title="加入腾讯频道【模拟器发布页】：版本发布、玩法讨论、报 bug；也在这里写关于我们">💬 交流</button>
         <button id="btn-save" class="ghost" title="导出存档文件">💾 导出</button>
         <button id="btn-load" class="ghost" title="导入存档文件">📂 导入</button>
         <button id="btn-new" class="primary">🔄 新的一局</button>
@@ -223,6 +224,20 @@
         <p class="muted small">
           本模拟器中的事件、人物、分数线和结局均为虚构，仅供娱乐，与任何真实学校或机构无关。
         </p>
+
+        <!-- 开局这一屏是新玩家看得最认真的一屏，交流入口和"这游戏谁做的"就放这里 -->
+        <div class="start-community">
+          <a
+            class="ghost-link"
+            href="https://pd.qq.com/s/c38ht6k4r"
+            data-community-link
+            target="_blank"
+            rel="noopener noreferrer"
+            title="版本发布、内容包、玩法讨论、报 bug 都在这里"
+            >💬 加入腾讯频道【模拟器发布页】</a
+          >
+          <button type="button" class="ghost-link" id="btn-about-start">关于我们 · 赞助商</button>
+        </div>
       </div>
     </div>
 
@@ -398,12 +413,69 @@
       </div>
     </div>
 
+    <!-- ---------- 交流 / 关于我们 ---------- -->
+    <div class="overlay hidden" id="community-modal">
+      <div class="card wide-card">
+        <div class="event-title">💬 交流 · 关于</div>
+
+        <div class="community-block">
+          <h3 class="build-title">加入腾讯频道【模拟器发布页】</h3>
+          <p class="muted">
+            新版本发布、内容包、玩法讨论、报 bug 都在这里。遇到问题直接说，顺手带一句「哪一届、什么难度、
+            卡在哪一步」，比截图问一句「为什么」有用得多。
+          </p>
+          <div class="start-actions">
+            <a
+              class="primary big"
+              id="link-community"
+              href="https://pd.qq.com/s/c38ht6k4r"
+              data-community-link
+              target="_blank"
+              rel="noopener noreferrer"
+              >点击链接加入腾讯频道</a
+            >
+            <button type="button" id="btn-community-copy" class="ghost big">复制频道链接</button>
+            <button type="button" id="btn-community-share" class="ghost big">📣 推荐给同学</button>
+          </div>
+          <p class="muted small community-url">
+            频道链接：<code id="community-url">https://pd.qq.com/s/c38ht6k4r</code>
+          </p>
+        </div>
+
+        <div class="community-block">
+          <h3 class="build-title">关于我们</h3>
+          <p class="muted">
+            马鞍山二中模拟器是一个<strong>个人独立项目</strong>：引擎、文案、界面都是自己写的，
+            用 Node.js + 原生 HTML/CSS/JS 做成——没有前端框架、没有后端服务、没有账号、没有广告和内购，
+            也不收集任何数据。当前版本 <b id="community-version">v2.9.0</b>。
+          </p>
+          <ul class="about-facts">
+            <li><span>项目性质</span>非商业、个人爱好作品，MIT 许可</li>
+            <li><span>运行环境</span>浏览器 / 安卓 5.0+ / Windows 桌面 / Node.js 18+</li>
+            <li><span>隐私</span>不收集数据、不联网（除非你自己配了更新地址）、不做统计与广告</li>
+            <li><span>内容声明</span>全部为虚构娱乐内容，与任何真实学校、机构、个人无关</li>
+          </ul>
+
+          <div class="sponsor-box">
+            <p class="sponsor-label">赞助商</p>
+            <p class="sponsor-name">印显元（爸爸）</p>
+            <p class="muted small">感谢出资支持这个项目，也感谢每一位在频道里提意见的玩家。</p>
+          </div>
+        </div>
+
+        <div class="start-actions">
+          <button type="button" id="btn-community-close" class="ghost">关闭</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ---------- 结局 ---------- -->
     <div class="overlay hidden" id="ending-modal">
       <div class="card ending-card">
         <div id="ending-body"></div>
         <div class="start-actions">
           <button id="btn-restart" class="primary big">再来一局</button>
+          <button id="btn-ending-share" class="ghost big">📣 分享这一局</button>
           <button id="btn-ending-gallery" class="ghost big">📖 查看图鉴</button>
         </div>
       </div>

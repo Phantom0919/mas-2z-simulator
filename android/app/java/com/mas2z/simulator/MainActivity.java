@@ -2,6 +2,9 @@ package com.mas2z.simulator;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.View;
@@ -11,6 +14,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Toast;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -54,6 +58,9 @@ public class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setMediaPlaybackRequiresUserGesture(true);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        // 明确关掉多窗口：网页里的外链（腾讯频道）用 target="_blank" 写的，
+        // 关掉之后这类点击会走 shouldOverrideUrlLoading，才能被我们丢给系统浏览器。
+        settings.setSupportMultipleWindows(false);
 
         // 自适应屏幕：按网页自己的 viewport meta 排版，别让 WebView 再缩放一次
         settings.setUseWideViewPort(true);
@@ -98,6 +105,40 @@ public class MainActivity extends Activity {
                         new ByteArrayInputStream(("Not found: " + path).getBytes(StandardCharsets.UTF_8)));
             }
         }
+
+        /**
+         * 网页里的外链（v2.9 的「加入腾讯频道【模拟器发布页】」）不能在这个 WebView 里打开：
+         * 它没有地址栏也没有后退键，玩家点进去就出不来了。交给系统——装了 QQ 就进 QQ，
+         * 否则用浏览器打开；玩家按返回键还是回到游戏。
+         */
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+            return openOutside(request.getUrl().toString());
+        }
+
+        /** API < 24 的机型只回调这个重载。 */
+        @Override
+        @SuppressWarnings("deprecation")
+        public boolean shouldOverrideUrlLoading(WebView view, String url) {
+            return openOutside(url);
+        }
+    }
+
+    /**
+     * 外链交给系统处理。
+     * @return true 表示"这个跳转我接管了，WebView 不要自己导航"
+     */
+    private boolean openOutside(String url) {
+        if (url == null || url.startsWith(ORIGIN)) return false; // 自己的页面继续留在 WebView 里
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (ActivityNotFoundException noApp) {
+            // 极少见：设备上一个能开 http(s) 的应用都没有
+            Toast.makeText(this, "没有能打开这个链接的应用：" + url, Toast.LENGTH_LONG).show();
+        }
+        return true;
     }
 
     private static String mimeOf(String path) {
