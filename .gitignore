@@ -8,7 +8,12 @@ android/debug.keystore
 saves/
 .DS_Store
 # 界面验收截图（本机产物，随时可重新生成）
-shots/
+#
+# 前面这个斜杠必须留着：写成 `shots/` 会匹配**任何一层**叫 shots 的目录，
+# 连官网真正在用的 docs/assets/shots/ 一起忽略掉。那 7 张截图就这样一直没进仓库，
+# 官网上全部 404（本地预览有文件，所以从界面上看不出问题）。
+# 只忽略仓库根目录下的 shots/。
+/shots/
 # Python 工具的字节码缓存
 __pycache__/
 *.pyc

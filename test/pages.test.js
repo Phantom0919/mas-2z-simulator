@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { existsSync, readFileSync, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -275,6 +276,48 @@ test('页面素材体积在预算内（手机流量党友好）', () => {
 
   const own = statSync(join(docsDir, 'assets', 'site.js')).size + statSync(join(docsDir, 'assets', 'style.css')).size;
   assert.ok(own <= 120 * 1024, `发布页自己的 JS+CSS 有 ${Math.round(own / 1024)} KB，太胖了`);
+});
+
+/**
+ * 回归：官网上所有截图曾经**一张都显示不出来**。
+ *
+ * 原因不在页面，而在 .gitignore：那条 `shots/`（本机验收截图用的）不限层级，
+ * 把 `docs/assets/shots/` 也一起忽略了 —— 文件在本机都在、本地预览也好好的，
+ * 但从来没进过仓库，GitHub Pages 上全是 404。
+ *
+ * 所以"资源存在"这条检查不够，还得问一句 git：**这个文件真的会被提交吗？**
+ * 这条测试就是替玩家问这一句。
+ */
+test('官网上引用的每张图都必须真的会被提交（不是被 .gitignore 吞掉）', () => {
+  const html = readDocs('index.html');
+  const referenced = [
+    ...new Set([
+      ...[...html.matchAll(/src="\.\/([^"]+\.(?:jpg|jpeg|png|webp|gif|ico|svg))"/g)].map((match) => match[1]),
+      ...[...html.matchAll(/data-full="\.\/([^"]+\.(?:jpg|jpeg|png|webp))"/g)].map((match) => match[1]),
+      ...[...html.matchAll(/href="\.\/([^"]+\.(?:png|ico|svg))"/g)].map((match) => match[1]),
+    ]),
+  ];
+  assert.ok(referenced.length >= 8, `页面引用的图太少（${referenced.length}），正则大概没匹配上`);
+
+  const missing = referenced.filter((relative) => !existsSync(join(docsDir, ...relative.split('/'))));
+  assert.deepEqual(missing, [], `这些图本地就不存在：${missing.join('、')}`);
+
+  // 只在这个目录确实是 git 仓库时才检查（导出源码包的人可能没有 .git）
+  if (!existsSync(join(root, '.git'))) return;
+  const ignored = [];
+  for (const relative of referenced) {
+    const result = spawnSync('git', ['check-ignore', '--quiet', join('docs', ...relative.split('/'))], {
+      cwd: root,
+      stdio: 'ignore',
+    });
+    // 退出码 0 = 被忽略（也就是线上会 404），1 = 会被提交，其它（比如没装 git）= 跳过
+    if (result.status === 0) ignored.push(relative);
+  }
+  assert.deepEqual(
+    ignored,
+    [],
+    `这些图被 .gitignore 忽略了，提交上去官网还是 404：${ignored.join('、')}（检查 .gitignore 里的目录规则有没有加前导斜杠）`,
+  );
 });
 
 test('发布页脚本没有调试残留，也没有内联脚本（CSP 会挡住）', () => {
