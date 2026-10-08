@@ -291,48 +291,76 @@ function settle(game) {
   let guard = 0;
   while (game.pendingEvent && game.status === 'playing' && guard < 10) {
     guard += 1;
+    /*
+     * 这一版新增了很多日常事件（events7.js），不少选项会顺带加知识
+     * （"帮老师改卷子"、"运动会去教室做卷子"之类）。
+     * 这两条测试测的是"每周的自然遗忘"，所以把事件带来的那一份收益还原掉：
+     * 遗忘在事件弹出之前就已经结算完了，resolveEvent 里只有事件自己的效果，
+     * 因此这里还原的正好是事件的那份，不会把遗忘也吃掉。
+     */
+    const knowledge = { ...game.knowledge };
     resolveEvent(game, game.pendingEvent.choices[0].id);
+    game.knowledge = knowledge;
   }
 }
 
+/**
+ * 用 `playWeek` 跑若干周：主行动只学数学，周末用指定行动。
+ *
+ * 为什么要这么写（v3.3 修）：
+ *   这两条测试原来用 `performAction` + `settle`，而 `settle` 会把随机事件的效果也算进来——
+ *   也就是说"没碰过的科目在掉"以前是**靠某个事件凑巧给了足够重的惩罚**才成立的：
+ *   同一个种子的随机流一变（比如又加了一批新事件），事件一换结论就翻。
+ *   现在改成：`skipEvents` 跳过随机事件，周末用一个**不带任何知识收益**的行动（食堂加餐），
+ *   于是没碰过的科目身上只剩"每周遗忘"这一件事，测的就是它本身。
+ */
+function decayWeek({ seed, weekendAction = 'canteen', weeks = 3, extra = {}, before } = {}) {
+  const game = createGame({ name: '遗忘', seed, weeksPerSemester: 6, ...extra });
+  const start = { ...game.knowledge };
+  const strategy = (state, phase) =>
+    phase === 'main'
+      ? { actionId: 'drill', subject: 'math' }
+      : weekendAction === 'drill'
+        ? { actionId: 'drill', subject: 'english' }
+        : { actionId: weekendAction };
+  for (let index = 0; index < weeks; index += 1) playWeek(game, strategy, { skipEvents: true });
+  if (typeof before === 'function') before(start, game);
+  return { game, start };
+}
+
 test('不进则退：没碰过的科目每周都会掉，碰过的几乎不掉', () => {
-  const game = createGame({ name: '遗忘', seed: 'decay-basic', weeksPerSemester: 6 });
-  const before = { ...game.knowledge };
+  const { game, start } = decayWeek({ seed: 'decay-basic' });
 
-  // 主行动只学数学；周末故意安排一个不学习的行动
-  performAction(game, 'drill', { subject: 'math' });
-  settle(game);
-  performAction(game, 'sleep');
-  settle(game);
-
-  const mathDelta = (game.knowledge.math ?? 0) - before.math;
-  const others = ['chinese', 'english', 'physics', 'chemistry', 'biology'].map(
-    (key) => (game.knowledge[key] ?? 0) - before[key],
-  );
+  const mathDelta = (game.knowledge.math ?? 0) - start.math;
+  const others = ['chinese', 'english', 'physics', 'chemistry', 'biology'].map((key) => [
+    key,
+    (game.knowledge[key] ?? 0) - (start[key] ?? 0),
+  ]);
 
   assert.ok(mathDelta > 0, `学过的那科应该涨（实际 ${mathDelta.toFixed(2)}）`);
-  for (const [index, delta] of others.entries()) {
-    assert.ok(delta < 0, `没碰过的科目应该在掉（第 ${index} 科 ${delta.toFixed(2)}）`);
+  for (const [key, delta] of others) {
+    assert.ok(delta < 0, `没碰过的 ${key} 应该在掉（实际 ${delta.toFixed(2)}）`);
   }
+  // 学过的那科必须明显领先没碰过的，否则"投入在哪"就没有区别
+  assert.ok(mathDelta > -others[0][1] * 3, `学过与没碰过的差距太小（${mathDelta.toFixed(2)}）`);
 });
 
-test('周末学了 vs 没学，掉的速度明显不一样', () => {
-  const runWeek = (weekendAction) => {
-    const game = createGame({ name: '对比', seed: 'decay-weekend', weeksPerSemester: 6 });
-    const before = { ...game.knowledge };
-    performAction(game, 'drill', { subject: 'math' });
-    settle(game);
-    performAction(game, weekendAction, weekendAction === 'drill' ? { subject: 'english' } : undefined);
-    settle(game);
+test('周末补的那科会涨，其它科在掉（同一周、只换周末行动）', () => {
+  const withStudy = decayWeek({ seed: 'decay-weekend', weekendAction: 'drill', weeks: 2 });
+  const withCanteen = decayWeek({ seed: 'decay-weekend', weekendAction: 'canteen', weeks: 2 });
 
-    const untouched = ['chinese', 'physics', 'chemistry', 'biology'];
-    const losses = untouched.map((key) => before[key] - (game.knowledge[key] ?? 0));
-    return losses.reduce((sum, value) => sum + value, 0) / losses.length;
-  };
+  const englishStudy = (withStudy.game.knowledge.english ?? 0) - withStudy.start.english;
+  const englishIdle = (withCanteen.game.knowledge.english ?? 0) - withCanteen.start.english;
+  assert.ok(englishStudy > englishIdle, `周末补英语应该比不补领先（${englishStudy.toFixed(2)} vs ${englishIdle.toFixed(2)}）`);
+  assert.ok(englishStudy > 0, `补了的那科应该涨（实际 ${englishStudy.toFixed(2)}）`);
+  assert.ok(englishIdle < 0, `没补的那科应该在掉（实际 ${englishIdle.toFixed(2)}）`);
 
-  const idle = runWeek('sleep'); // 周末睡觉
-  const study = runWeek('drill'); // 周末也学一门
-  assert.ok(idle > study * 2, `周末不学应该掉得明显更多（不学 ${idle.toFixed(3)} vs 学 ${study.toFixed(3)}）`);
+  // 两个星期都不碰的科目：两条路线掉得差不多（周遗忘只跟难度 / 天赋有关）
+  for (const key of ['chinese', 'physics', 'chemistry', 'biology']) {
+    const studyLoss = withStudy.start[key] - (withStudy.game.knowledge[key] ?? 0);
+    const idleLoss = withCanteen.start[key] - (withCanteen.game.knowledge[key] ?? 0);
+    assert.ok(Math.abs(studyLoss - idleLoss) < 1.5, `${key} 的周遗忘不该被周末选什么影响（${studyLoss.toFixed(2)} vs ${idleLoss.toFixed(2)}）`);
+  }
 });
 
 test('遗忘会被难度放大、被"过目不忘"这类天赋缩小', () => {

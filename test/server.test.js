@@ -194,8 +194,23 @@ test('需要选科的行动与事件接口', async () => {
 test('存档导出 / 导入 / 时间线接口', async () => {
   await withServer(async (base) => {
     const { gameId } = await newGame(base, { seed: 'api-save' });
-    await post(base, '/api/action', { gameId, actionId: 'listen' });
-    await post(base, '/api/action', { gameId, actionId: 'sport' });
+    /*
+     * 走行动接口时要顺手处理随机事件：引擎不允许"事件没选完就做下一个行动"，
+     * 而每加一批新内容，随机流都会变（以前这个种子不弹事件，现在可能弹）。
+     * 这里按真实客户端的做法把事件选掉，测试才不会绑死在事件池上。
+     */
+    const act = async (actionId, extra = {}) => {
+      const started = await post(base, '/api/action', { gameId, actionId, ...extra });
+      assert.equal(started.status, 200, `${actionId} 应该被接受`);
+      for (let guard = 0; guard < 5; guard += 1) {
+        const state = await (await fetch(`${base}/api/view?gameId=${encodeURIComponent(gameId)}`)).json();
+        const pending = state.view.pendingEvent;
+        if (!pending) break;
+        await post(base, '/api/event', { gameId, choiceId: pending.choices[0].id });
+      }
+    };
+    await act('listen');
+    await act('sport');
 
     const exported = await fetch(`${base}/api/export?gameId=${encodeURIComponent(gameId)}`);
     assert.equal(exported.status, 200);

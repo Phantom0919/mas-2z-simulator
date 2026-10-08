@@ -279,7 +279,9 @@ test('特殊路线（体育单招）不经过志愿填报', () => {
       game.flags.sportsTeam = true;
       game.stats.physique = 100;
     }
-    playWeek(game, strategy, { autoVolunteer: false });
+    // skipEvents：这条测试只测"特殊路线的判定与志愿流程"，随机事件不参与——
+    // 否则每加一批新内容，随机流一变（比如弹了"网咖赛"这种带结局的事件）就会把它打红
+    playWeek(game, strategy, { autoVolunteer: false, skipEvents: true });
   }
   assert.equal(game.status, 'ended');
   assert.equal(game.ending.id, 'sports', `应该走体育单招，实际是 ${game.ending.id}`);

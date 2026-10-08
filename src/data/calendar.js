@@ -199,6 +199,16 @@ export const EVENT_SCHEDULE = {
   netbar_amateur_cup: { anytime: true },
   part_time_rebate_scam: { grade: [2, 3], note: '高二高三缺零花钱的人才会去找兼职' },
 
+  /* --- 一周里的那些小事（events7.js / v3.3） --- */
+  canteen_new_window: { anytime: true },
+  winter_window_war: { term: 'autumn', minWeek: 2, note: '天冷了才有暖气/开窗之争' },
+  sports_meet_relay: { term: 'autumn', minWeek: 2, note: '秋季运动会才有 4×100 接力' },
+  grader_helper: { anytime: true },
+  seat_change_after_midterm: { anytime: true, note: '期中之后重新排座位' },
+  phone_confiscated: { anytime: true },
+  parents_meeting_eve: { anytime: true, note: '家长会一般安排在期中期末前后' },
+  class_album_sign: { grade: [3], term: 'spring', minWeek: 3, note: '同学录是毕业前才传的' },
+
   /* --- 因果链（events6.js） ---
    * 第一环是随机池里的种子，后续环（chain_ 前缀、chainOnly）只能被前一环的
    * `chain` 强制弹出来，所以时间上不设限：它该来的时候是"几周后"，不是"第几周"。

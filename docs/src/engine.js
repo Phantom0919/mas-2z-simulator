@@ -67,6 +67,7 @@ import { SEASONAL_EVENTS } from './data/events3.js';
 import { ABSTRACT_EVENTS } from './data/events4.js';
 import { CAMPUS_ACHIEVEMENTS, CAMPUS_EVENTS } from './data/events5.js';
 import { CHAIN_ACHIEVEMENTS, CHAIN_EVENTS } from './data/events6.js';
+import { DAILY_ACHIEVEMENTS, DAILY_EVENTS } from './data/events7.js';
 import {
   calendarOf,
   matchesSchedule,
@@ -99,7 +100,7 @@ import {
 /** 存档格式版本（结构变了才动它）。 */
 export const VERSION = 2;
 /** 游戏版本。内容包的 `requires.app` 拿它做兼容判断；和 package.json 必须一致（有测试盯着）。 */
-export const GAME_VERSION = '3.2.1';
+export const GAME_VERSION = '3.3.0';
 
 /* ------------------------------------------------------- 内容（可热更新） */
 
@@ -116,6 +117,8 @@ const BASELINE = {
     ...SEASONAL_EVENTS,
     ...ABSTRACT_EVENTS,
     ...CAMPUS_EVENTS,
+    // 一周里的那些小事（食堂 / 暖气 / 接力 / 改卷子 / 家长会 / 同学录…）
+    ...DAILY_EVENTS,
     // 因果链事件：第一环从随机池进来，后面几环带 chainOnly，只能被"链"出来
     ...CHAIN_EVENTS,
     // 剧情事件也并进事件表，但带 story: true，不会进随机池
@@ -1748,6 +1751,18 @@ export function playWeek(game, strategy, options = {}) {
     }
     lines.push(...result.lines);
     while (game.pendingEvent && game.status === 'playing') {
+      /*
+       * skipEvents：只跑"行动 + 养成"，把这一拍弹出来的随机事件丢掉。
+       *
+       * 给模拟器 / 回归测试用的（`tools/sim.js`、`test/volunteer.test.js`）：
+       * 加了新事件之后随机流一定会变，如果测试结论依赖"某个种子下会弹什么事件"，
+       * 那每加一批内容都要回去改一堆断言。要测"纯养成曲线"的用例就用这个开关，
+       * 把内容量这个变量拿掉——不是给玩家用的后门，UI 走的是 performAction / resolveEvent。
+       */
+      if (options.skipEvents) {
+        game.pendingEvent = null;
+        break;
+      }
       const pending = game.pendingEvent;
       const choiceId =
         (decision.chooseEvent ? decision.chooseEvent(pending, game) : null) ?? pending.choices[0]?.id;
@@ -2718,6 +2733,10 @@ function collectAchievements(game) {
   }
   // 因果链事件自带的成就（同样由内容文件声明，引擎只按 flag 捡）
   for (const item of CHAIN_ACHIEVEMENTS) {
+    if (game.flags[item.flag]) add(item.icon, item.name, item.desc);
+  }
+  // 一周日常事件自带的成就（events7.js）
+  for (const item of DAILY_ACHIEVEMENTS) {
     if (game.flags[item.flag]) add(item.icon, item.name, item.desc);
   }
   return list;
