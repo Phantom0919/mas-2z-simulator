@@ -1,10 +1,10 @@
 {
   "format": 1,
-  "version": "3.0.0",
+  "version": "3.1.0",
   "file": "中二野人实验室-安卓版.apk",
   "url": "./download/中二野人实验室-安卓版.apk",
-  "bytes": 498878,
-  "sha256": "2b6f7800bc8cbce1fac0173e1247b5cbe274dbb747a3652523b91530e36aebb6",
-  "builtAt": "2026-10-08T05:28:48.528Z",
+  "bytes": 511320,
+  "sha256": "bf2f6c94a7ec44223fb22896a43322ffa2f268b83f0a4cc4325142f3548b9c8a",
+  "builtAt": "2026-10-08T11:22:14.494Z",
   "note": "debug 签名，安装时系统会提示「未知来源应用」，功能不受影响。"
 }

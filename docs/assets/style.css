@@ -956,6 +956,127 @@ code {
   cursor: pointer;
 }
 
+/* ------------------------------------------------------------ 排行榜 */
+
+.board-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.board-tabs button {
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.board-tabs button.on {
+  color: var(--text);
+  border-color: var(--blue);
+  background: rgba(47, 129, 247, 0.14);
+}
+
+.board-note {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  color: var(--faint);
+}
+
+.board-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.site-board-list:empty {
+  display: none;
+}
+
+.board-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 11px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.board-list li.mine {
+  border-color: rgba(79, 212, 99, 0.5);
+  background: linear-gradient(180deg, rgba(79, 212, 99, 0.09), var(--panel));
+}
+
+.board-list li.tied .board-position::after {
+  content: '=';
+  margin-left: 2px;
+  font-size: 11px;
+  color: var(--green);
+}
+
+.board-position {
+  flex: 0 0 36px;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--blue);
+}
+
+.board-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.board-name {
+  font-weight: 700;
+}
+
+.board-ending {
+  font-size: 15px;
+  color: var(--text);
+}
+
+.board-meta {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.board-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.board-badge.versus {
+  color: #bc8cff;
+  border-color: rgba(188, 140, 255, 0.42);
+}
+
+.board-empty,
+.board-mine {
+  margin: 14px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.board-mine b {
+  color: var(--green);
+}
+
 /* ------------------------------------------------------------------ toast */
 
 .toast {

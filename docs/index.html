@@ -36,7 +36,8 @@
     />
 
     <link rel="stylesheet" href="./assets/style.css" />
-    <script src="./assets/site.js" defer></script>
+    <!-- type="module"：排行榜的排序/并列名次直接复用游戏那份 src/leaderboard.js，两处不各写一遍 -->
+    <script src="./assets/site.js" type="module"></script>
   </head>
 
   <body id="top">
@@ -56,6 +57,7 @@
           <a href="#updates">更新</a>
           <a href="#faq">问答</a>
           <a href="#community">交流</a>
+          <a href="#leaderboard">排行榜</a>
         </nav>
         <a class="btn btn-small btn-primary nav-cta" href="./play/index.html">▶ 立即试玩</a>
       </div>
@@ -67,7 +69,7 @@
         <div class="hero-glow" aria-hidden="true"></div>
         <div class="wrap hero-inner">
           <p class="badge-row">
-            <span class="badge" data-version-badge>v3.0.0</span>
+            <span class="badge" data-version-badge>v3.1.0</span>
             <span class="badge">网页 / 安卓 / 桌面 / 终端</span>
             <span class="badge">免费 · 无广告 · 无内购</span>
             <span class="badge">不联网也能玩</span>
@@ -262,7 +264,7 @@
               <h3>🤖 安卓版 APK</h3>
               <p class="plan-desc">
                 约 <span data-apk-size>0.5 MB</span>，不用装任何框架。装的时候系统会提示「未知来源应用」——因为它是个人项目、
-                没有上架商店。版本 <span data-apk-version>v3.0.0</span>。
+                没有上架商店。版本 <span data-apk-version>v3.1.0</span>。
               </p>
               <p class="plan-actions">
                 <a class="btn btn-primary" href="./download/中二野人实验室-安卓版.apk" download>⬇ 下载 APK</a>
@@ -293,6 +295,18 @@ npm run web      # 网页版（本地服务）</code></pre>
           <p class="section-sub">每个版本都做完整回归测试后才发；发版之后还能靠内容包继续加东西。</p>
 
           <ol class="timeline">
+            <li>
+              <span class="tl-ver">v3.1</span>
+              <div class="tl-body">
+                <h3>排行榜：问你昵称，成绩能上榜</h3>
+                <p>
+                  第一次进游戏会问你怎么称呼（只存在你自己的设备上）。打完一局在结局页点「🏆 上榜」就能提交：
+                  <strong>总分榜</strong>看高考分，<strong>收集榜</strong>看结局图鉴解锁了多少；
+                  每条都带难度徽章和随机种子——难度不同分数不可比，而种子让同一局可以被任何人复核。
+                  没网或后端挂了也不影响玩，成绩照样记在本机榜里。
+                </p>
+              </div>
+            </li>
             <li>
               <span class="tl-ver">v3.0</span>
               <div class="tl-body">
@@ -396,6 +410,17 @@ npm run web      # 网页版（本地服务）</code></pre>
             </details>
 
             <details>
+              <summary>排行榜怎么上榜？昵称会被别人看到吗？</summary>
+              <p>
+                <strong>会——昵称就是榜上显示的名字，所以别填真名。</strong>第一次进游戏会问你怎么称呼，
+                这个昵称只存在你自己的设备里，随时能在「🏆 排行榜」面板里改。打完一局在结局页点「🏆 上榜」就提交了。
+                提交的内容只有：昵称、结局、高考总分、年级名次、难度、单人还是 AI 对战、图鉴与成就收集数，
+                以及随机种子和构筑摘要（用来让人复核同一局）——<strong>没有设备信息、没有账号、没有位置</strong>。
+                不想上榜，就永远别点那个按钮。
+              </p>
+            </details>
+
+            <details>
               <summary>游戏里的学校和分数线是真的吗？</summary>
               <p>
                 全部为<strong>虚构娱乐内容</strong>，与任何真实学校、机构、个人无关。
@@ -435,6 +460,30 @@ npm run web      # 网页版（本地服务）</code></pre>
               </p>
             </details>
           </div>
+        </div>
+      </section>
+
+      <!-- ---------- 🏆 排行榜 ---------- -->
+      <section class="section section-alt" id="leaderboard">
+        <div class="wrap">
+          <h2 class="section-title">玩家排行榜</h2>
+          <p class="section-sub">
+            打完一局之后，在游戏里点「🏆 上榜」就提交到这儿。<strong>难度不同分数本来不可比</strong>，
+            所以每一行都带难度徽章；每条成绩还会带上随机种子——同一局谁都能照着复现，假数据一眼就露。
+          </p>
+
+          <div class="board-tabs" id="board-tabs" role="tablist"></div>
+          <p class="board-note" id="board-note"></p>
+
+          <ol class="board-list site-board-list" id="board-list"></ol>
+          <p class="board-empty" id="board-empty" hidden></p>
+
+          <p class="board-mine" id="board-mine" hidden></p>
+
+          <p class="callout">
+            🏆 想上榜？先<a href="./play/index.html">在线试玩</a>或下载安卓版，打完一局在结局页点「🏆 上榜」。
+            昵称第一次进游戏时会问你，之后可以在「🏆 排行榜」面板里随时改（只存在你自己的设备上）。
+          </p>
         </div>
       </section>
 
@@ -517,7 +566,7 @@ npm run web      # 网页版（本地服务）</code></pre>
           <div>
             <p class="footer-title">中二野人实验室</p>
             <p class="footer-sub">
-              <span data-version-badge>v3.0.0</span> · 厚德 · 励学 · 敦行
+              <span data-version-badge>v3.1.0</span> · 厚德 · 励学 · 敦行
             </p>
           </div>
         </div>

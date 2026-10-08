@@ -1,0 +1,9 @@
+{
+  "format": 1,
+  "supabase": {
+    "url": "https://unlqwtambyxhzjbmtjgw.supabase.co",
+    "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVubHF3dGFtYnl4aHpqYm10amd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0Mjg2MDIsImV4cCI6MjEwNzAwNDYwMn0.OZ8pUl97tE5E2sL06CFCPJyKeNFEoZudl18fav8vEX4",
+    "table": "leaderboard"
+  },
+  "note": "排行榜后端配置。留空 = 只有本机榜（离线优先，页面不会发任何请求）。anon key 是 Supabase 公开的 publishable 密钥，写进前端是有意为之；真正的门禁在表的 RLS 策略里（见 tools/leaderboard-schema.sql：匿名只能 select / insert）。"
+}

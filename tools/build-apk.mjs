@@ -31,14 +31,22 @@ const APP_DIR = path.join(ROOT, 'android', 'app');
 const MIN_SDK = 21;
 const TARGET_SDK = 34;
 
-/** 浏览器端的入口（其余模块顺着 import 自动收集）。 */
-const WEB_ENTRIES = ['local-api.js', 'relations-view.js'];
+/**
+ * 浏览器端的入口（其余模块顺着 import 自动收集）。
+ *
+ * app.js 也列进来：它是页面真正的入口，v3.1 起它自己 import 了 src/leaderboard.js——
+ * 只从 local-api / relations-view 收的话排行榜模块不会进包，装到手机上就是白屏。
+ */
+const WEB_ENTRIES = ['app.js', 'local-api.js', 'relations-view.js'];
 /** 无论怎么收集，这几个都必须进包，否则页面必然打不开。 */
 const REQUIRED_MODULES = [
   'src/engine.js',
   'src/rng.js',
   'src/story.js',
   'src/tree.js',
+  'src/leaderboard.js',
+  'src/update.js',
+  'src/content.js',
   'src/data/school.js',
   'src/data/character.js',
   'src/data/items.js',

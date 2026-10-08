@@ -14,6 +14,20 @@
 
 import { createLocalApi } from './local-api.js';
 import { GAME_VERSION } from '../src/engine.js';
+import {
+  DEFAULT_NICKNAME,
+  LEADERBOARD_METRICS,
+  MAX_LOCAL_ENTRIES,
+  emptyConfig,
+  entryFromRun,
+  isConfigured,
+  normalizeNickname,
+  rankEntries,
+  reproduceText,
+  submitEntry,
+  fetchBoard,
+  summarizeBoard,
+} from '../src/leaderboard.js';
 import { summarizeUpdate } from '../src/update.js';
 import {
   castCardHtml,
@@ -41,6 +55,12 @@ const MAX_FLAWS = 1;
  * 在网页上玩的人也就多了，所以这个地址必须能被复制出去。
  */
 const COMMUNITY_URL = 'https://pd.qq.com/s/c38ht6k4r';
+/** 榜单昵称（只在这台设备上） */
+const NICKNAME_KEY = 'mas2z-nickname-v1';
+/** 本机榜（没接后端、或者断网时看的就是它） */
+const LEADERBOARD_KEY = 'mas2z-leaderboard-local-v1';
+/** 已经上榜过的"局"，避免同一局反复提交 */
+const LEADERBOARD_SUBMITTED_KEY = 'mas2z-leaderboard-submitted-v1';
 
 const state = {
   gameId: null,
@@ -50,6 +70,16 @@ const state = {
   linesTimer: null,
   /** 已经记入图鉴的「局 + 结局」，避免重复统计。 */
   recorded: null,
+  /** 排行榜的运行时状态（配置、当前看的榜、拉回来的条目、待上榜的那一局）。 */
+  leaderboard: {
+    config: null,
+    metric: 'score',
+    entries: [],
+    source: 'local',
+    loading: false,
+    recorded: null,
+    pending: null,
+  },
   /** 开局构筑的临时选择（自定义人物的全部字段都在这里）。 */
   draft: {
     name: '',
@@ -582,6 +612,7 @@ function render(view) {
   if (view.pendingEvent) openEventModal(view.pendingEvent);
   if (view.status === 'ended' && view.ending) {
     recordRun(view);
+    recordLeaderboardRun(view);
     renderEnding(view.ending);
   } else if (view.status === 'volunteering' && view.volunteer?.active && !view.volunteer?.submitted) {
     // 高考出分之后、录取之前：先填志愿，填完才进结局
@@ -1441,6 +1472,7 @@ function closeModals() {
   $('relations-modal').classList.add('hidden');
   $('story-modal').classList.add('hidden');
   $('community-modal').classList.add('hidden');
+  $('leaderboard-modal').classList.add('hidden');
 }
 
 /**
@@ -1451,6 +1483,7 @@ function hideRunModals() {
   $('volunteer-modal').classList.add('hidden');
   $('content-modal').classList.add('hidden');
   $('community-modal').classList.add('hidden');
+  $('leaderboard-modal').classList.add('hidden');
 }
 
 function openEventModal(pending) {
@@ -2328,6 +2361,258 @@ function continueToEnding() {
   }
 }
 
+/* ------------------------------------------------------------ 🏆 排行榜 */
+
+/**
+ * 昵称 + 排行榜（v3.1）。
+ *
+ * 三条原则，跟这个项目其余部分一致：
+ *   1. **离线优先**：没配后端就只玩本机榜，一个请求都不发；断网时榜单降级成本机榜；
+ *   2. **不挡游戏**：任何一步失败都只是 toast，绝不让排行榜卡住开局或结局；
+ *   3. **不装**：客户端提交的成绩防不了作弊，能给的只有"可复核"（条目里带种子和构筑）。
+ */
+
+function getNickname() {
+  try {
+    return localStorage.getItem(NICKNAME_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/** 保存昵称；返回最终使用的昵称（空的会退回默认名）。 */
+function setNickname(value) {
+  const name = normalizeNickname(value, '');
+  try {
+    if (name) localStorage.setItem(NICKNAME_KEY, name);
+    else localStorage.removeItem(NICKNAME_KEY);
+  } catch {
+    /* 存储不可用时昵称只是本次会话有效 */
+  }
+  return name || DEFAULT_NICKNAME;
+}
+
+function loadLocalBoard() {
+  try {
+    const raw = localStorage.getItem(LEADERBOARD_KEY);
+    const data = raw ? JSON.parse(raw) : null;
+    const entries = Array.isArray(data?.entries) ? data.entries : Array.isArray(data) ? data : [];
+    return entries.filter((item) => item && typeof item === 'object');
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalBoard(entries) {
+  try {
+    localStorage.setItem(LEADERBOARD_KEY, JSON.stringify({ version: 1, entries: entries.slice(0, MAX_LOCAL_ENTRIES) }));
+  } catch {
+    /* 存不下就算了，不影响这一局 */
+  }
+}
+
+/** 读取后端配置（web/content/leaderboard.json）。空 = 只有本机榜。 */
+async function leaderboardConfig() {
+  if (state.leaderboard.config) return state.leaderboard.config;
+  let config = emptyConfig();
+  try {
+    const response = await fetch('./content/leaderboard.json', { cache: 'no-store' });
+    if (response.ok) {
+      const text = await response.text();
+      const data = JSON.parse(text);
+      if (data && typeof data === 'object') config = { ...emptyConfig(), ...data };
+    }
+  } catch {
+    config = emptyConfig();
+  }
+  state.leaderboard.config = config;
+  return config;
+}
+
+/** 一局结束时：整理成榜单条目、记进本机榜、留作"待上榜"。 */
+function recordLeaderboardRun(view) {
+  const ending = view?.ending;
+  if (!ending) return;
+  const profile = loadProfile();
+  const entry = entryFromRun({ nickname: getNickname() || DEFAULT_NICKNAME, view, profile });
+  const stamp = `${view.student?.name ?? '我'}|${entry.endingId}|${entry.score ?? '-'}|${entry.endings}`;
+  if (state.leaderboard.recorded === stamp) return;
+  state.leaderboard.recorded = stamp;
+
+  const board = loadLocalBoard();
+  board.unshift(entry);
+  saveLocalBoard(board);
+  state.leaderboard.pending = entry;
+}
+
+/** 已经上榜过的局就不重复提交了（同一局点两次不该多一条记录）。 */
+function alreadySubmitted(entry) {
+  try {
+    const list = JSON.parse(localStorage.getItem(LEADERBOARD_SUBMITTED_KEY) ?? '[]');
+    const key = `${entry.nickname}|${entry.endingId}|${entry.score ?? '-'}|${entry.seed ?? ''}`;
+    return Array.isArray(list) && list.includes(key);
+  } catch {
+    return false;
+  }
+}
+
+function markSubmitted(entry) {
+  try {
+    const list = JSON.parse(localStorage.getItem(LEADERBOARD_SUBMITTED_KEY) ?? '[]');
+    const key = `${entry.nickname}|${entry.endingId}|${entry.score ?? '-'}|${entry.seed ?? ''}`;
+    const next = [...new Set([...(Array.isArray(list) ? list : []), key])].slice(-40);
+    localStorage.setItem(LEADERBOARD_SUBMITTED_KEY, JSON.stringify(next));
+  } catch {
+    /* 记不住就允许重复提交，问题不大 */
+  }
+}
+
+function difficultyLabel(key) {
+  const item = listOf('difficulties').find((entry) => entry.key === key);
+  return item?.name ?? key ?? '';
+}
+
+function leaderboardRowHtml(entry) {
+  const badges = [
+    `<span class="board-badge">${escapeHtml(difficultyLabel(entry.difficulty))}</span>`,
+    entry.mode === 'versus'
+      ? `<span class="board-badge versus">⚔️ AI${entry.rivalLevel ? `·${escapeHtml(entry.rivalLevel)}` : ''}</span>`
+      : `<span class="board-badge">🎮 单人</span>`,
+  ];
+  const score = entry.score ? `<b>${entry.score}</b> 分` : '未参加高考';
+  const rank = entry.rank ? `　年级第 ${entry.rank} 名` : '';
+  return `
+    <li class="board-row${entry.tied ? ' tied' : ''}">
+      <span class="board-position">${entry.position}</span>
+      <span class="board-main">
+        <span class="board-name">${escapeHtml(entry.nickname)}${entry.tied ? ' <i>并列</i>' : ''}</span>
+        <span class="board-ending">${escapeHtml(entry.endingTitle)}</span>
+        <span class="board-meta">${score}${rank}　📖 图鉴 ${entry.endings}　🏅 成就 ${entry.achievements}　${badges.join('')}</span>
+      </span>
+    </li>`;
+}
+
+function renderLeaderboard() {
+  const board = state.leaderboard;
+  const metric = LEADERBOARD_METRICS.find((item) => item.key === board.metric) ?? LEADERBOARD_METRICS[0];
+  const configured = isConfigured(board.config);
+  const nickname = getNickname() || DEFAULT_NICKNAME;
+
+  $('leaderboard-tabs').innerHTML = LEADERBOARD_METRICS.map(
+    (item) =>
+      `<button type="button" class="tab${item.key === metric.key ? ' on' : ''}" data-metric="${item.key}">${item.icon} ${escapeHtml(item.name)}</button>`,
+  ).join('');
+  for (const button of $('leaderboard-tabs').querySelectorAll('button[data-metric]')) {
+    button.addEventListener('click', () => {
+      board.metric = button.dataset.metric;
+      renderLeaderboard();
+      void refreshBoard();
+    });
+  }
+
+  const summary = summarizeBoard(board.entries, metric.key, nickname);
+  const sourceText = configured
+    ? board.source === 'remote'
+      ? `🌐 全服榜（共 ${summary.total} 位玩家）`
+      : board.loading
+        ? '🌐 全服榜读取中…（下面先显示本机成绩）'
+        : '🌐 全服榜（读取中…）'
+    : '📴 本机榜（作者还没接后端，只有这台设备上的成绩）';
+  $('leaderboard-status').innerHTML =
+    `${sourceText}　·　你的昵称：<b>${escapeHtml(nickname)}</b>` +
+    (summary.mine ? `　·　当前排第 <b>${summary.mine.position}</b>` : '') +
+    (configured ? '' : '　·　接后端的方法见 README 的「排行榜」一节');
+  $('leaderboard-note').textContent = `${metric.icon} ${metric.desc}`;
+
+  const list = board.entries;
+  $('leaderboard-body').innerHTML = list.length
+    ? `<ol class="board-list">${list.map(leaderboardRowHtml).join('')}</ol>`
+    : `<p class="muted small">${configured ? '这个榜还是空的——打完一局点「🏆 把这一局上榜」就是第一条。' : '还没有本地成绩：打完一局会自动记下来。'}</p>`;
+
+  const input = $('input-nickname-board');
+  if (input && document.activeElement !== input) input.value = getNickname();
+}
+
+/** 本机榜也要排序 + 并列名次（和全服榜走同一套规则） */
+function rankLocal(metric) {
+  return rankEntries(loadLocalBoard(), metric);
+}
+
+async function refreshBoard() {
+  const board = state.leaderboard;
+  const config = await leaderboardConfig();
+  if (!isConfigured(config)) {
+    board.source = 'local';
+    board.entries = rankLocal(board.metric);
+    renderLeaderboard();
+    return;
+  }
+  board.loading = true;
+  renderLeaderboard();
+  const result = await fetchBoard(config, { metric: board.metric });
+  board.loading = false;
+  if (result.ok) {
+    board.source = 'remote';
+    board.entries = result.entries;
+  } else {
+    // 读不到就退回本机榜：断网、墙上、后端挂了都不该让玩家看到一个空白面板
+    board.source = 'local';
+    board.entries = rankLocal(board.metric);
+    toast('排行榜连不上，先看本机成绩。');
+  }
+  renderLeaderboard();
+}
+
+async function openLeaderboardModal() {
+  state.leaderboard.entries = rankLocal(state.leaderboard.metric);
+  renderLeaderboard();
+  $('leaderboard-modal').classList.remove('hidden');
+  await refreshBoard();
+}
+
+/**
+ * 把这一局上榜。
+ *
+ * 顺序刻意是"先记本机、再试后端"：没网、没配后端、Supabase 挂了，
+ * 玩家至少还能在本机榜看到自己的成绩，而不是点一下什么都没发生。
+ */
+async function submitCurrentRun({ announce = true } = {}) {
+  const entry = state.leaderboard.pending;
+  if (!entry) {
+    if (announce) toast('先打完一局再来上榜。');
+    return false;
+  }
+  const nickname = setNickname(getNickname() || entry.nickname);
+  const finalEntry = { ...entry, nickname };
+
+  const config = await leaderboardConfig();
+  if (!isConfigured(config)) {
+    if (announce) toast(`本机榜已记下（${nickname}）。全服榜还没接后端，作者配好之后就能上榜。`);
+    return false;
+  }
+  if (alreadySubmitted(finalEntry)) {
+    if (announce) toast('这一局已经上过榜了。');
+    return true;
+  }
+
+  state.leaderboard.loading = true;
+  renderLeaderboard();
+  const result = await submitEntry(config, finalEntry);
+  state.leaderboard.loading = false;
+  if (!result.ok) {
+    const why =
+      result.reason === 'unreachable' ? '连不上排行榜服务器，稍后再试（本机榜已经记下了）。' : `上榜失败：${result.reason}`;
+    if (announce) toast(why);
+    return false;
+  }
+  markSubmitted(finalEntry);
+  if (announce) {
+    toast(`已上榜：${finalEntry.nickname} · ${finalEntry.endingTitle}。复制这行可以让人复核：${reproduceText(finalEntry)}`);
+  }
+  await refreshBoard();
+  return true;
+}
+
 /* ------------------------------------------------------------ 结局 */
 
 function renderEnding(ending) {
@@ -2408,6 +2693,13 @@ function renderEnding(ending) {
       也欢迎来腾讯频道【模拟器发布页】聊聊：
       <a href="${escapeHtml(COMMUNITY_URL)}" target="_blank" rel="noopener noreferrer">${escapeHtml(COMMUNITY_URL)}</a>
     </p>
+    ${
+      state.leaderboard.pending
+        ? `<p class="ending-community">🏆 这一局已经记进<b>本机榜</b>（榜上昵称：<b>${escapeHtml(
+            state.leaderboard.pending.nickname,
+          )}</b>）。点「🏆 上榜」可以提交到全服榜，昵称在排行榜面板里随时改。</p>`
+        : ''
+    }
   `;
   $('ending-modal').classList.remove('hidden');
 }
@@ -2655,6 +2947,34 @@ function bind() {
     const ok = await copyText(endingShareText());
     toast(ok ? '这一局的成绩已复制，去频道或群里晒一晒。' : `复制失败，链接是 ${COMMUNITY_URL}`);
   });
+
+  // 🏆 排行榜：昵称 + 两个榜 + 上榜
+  $('btn-leaderboard').addEventListener('click', openLeaderboardModal);
+  $('btn-leaderboard-close').addEventListener('click', () => $('leaderboard-modal').classList.add('hidden'));
+  $('btn-leaderboard-refresh').addEventListener('click', () => {
+    void refreshBoard();
+  });
+  $('btn-leaderboard-submit').addEventListener('click', () => {
+    void submitCurrentRun();
+  });
+  $('btn-ending-leaderboard').addEventListener('click', async () => {
+    await submitCurrentRun();
+    await openLeaderboardModal();
+  });
+  $('btn-save-nickname').addEventListener('click', () => {
+    const name = setNickname($('input-nickname-board').value);
+    if (state.leaderboard.pending) state.leaderboard.pending = { ...state.leaderboard.pending, nickname: name };
+    toast(`昵称已保存：${name}`);
+    renderLeaderboard();
+  });
+  $('btn-nickname-save').addEventListener('click', () => {
+    const name = setNickname($('input-nickname-first').value);
+    $('nickname-modal').classList.add('hidden');
+    toast(`好，${name}——三年之后榜上见。`);
+  });
+  $('btn-nickname-skip').addEventListener('click', () => {
+    $('nickname-modal').classList.add('hidden');
+  });
   $('btn-gallery-reset').addEventListener('click', () => {
     saveProfile(emptyProfile());
     renderGallery();
@@ -2790,6 +3110,8 @@ async function main() {
     toast(`读取开局选项失败：${error.message}`);
   }
   updateContinueButton();
+  // 第一次进来先问昵称：它只是本机的一个字符串，没有网络请求，所以同步弹就行
+  if (!getNickname()) $('nickname-modal').classList.remove('hidden');
   try {
     await maybeAutoStart();
   } catch (error) {

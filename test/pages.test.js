@@ -151,6 +151,7 @@ test('在线试玩副本与 web/ 逐字节一致（玩家不该玩到旧版本�
     'content/official-pack.json',
     'content/update-endpoint.json',
     'content/update-manifest.json',
+    'content/leaderboard.json',
   ];
   for (const file of files) {
     const source = join(root, 'web', ...file.split('/'));
@@ -169,12 +170,13 @@ test('在线试玩的引擎模块图完整（少一个模块就是白屏）', as
   const { collectModulesChecked } = await import('../tools/module-graph.mjs');
   const { modules, problems } = collectModulesChecked({
     root,
-    entries: ['local-api.js', 'relations-view.js'].map((name) => join(docsDir, 'play', name)),
+    entries: ['app.js', 'local-api.js', 'relations-view.js'].map((name) => join(docsDir, 'play', name)),
     required: [
       'docs/src/engine.js',
       'docs/src/rng.js',
       'docs/src/story.js',
       'docs/src/tree.js',
+      'docs/src/leaderboard.js',
       'docs/src/data/school.js',
       'docs/src/data/character.js',
       'docs/src/data/items.js',
@@ -284,7 +286,8 @@ test('发布页脚本没有调试残留，也没有内联脚本（CSP 会挡住�
   const html = readDocs('index.html');
   assert.ok(!/<script(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/.test(html), '不能有内联脚本');
   assert.match(html, /script-src 'self'/, '应该声明 CSP');
-  assert.match(html, /defer/, '脚本要 defer，别挡住首屏渲染');
+  // 首屏不能被脚本卡住：普通脚本要 defer，模块脚本天生就是 deferred
+  assert.ok(/defer/.test(html) || /type="module"/.test(html), '脚本要 defer 或 type="module"');
 });
 
 test('发布页的文本文件都是无 BOM 的 UTF-8', () => {
@@ -388,6 +391,8 @@ function createFakeBrowser(html, buildInfo) {
         element.removed = true;
       },
       querySelector: (selector) => (selector === 'img' ? element.image : null),
+      querySelectorAll: () => [],
+      innerHTML: '',
     };
     return element;
   };
@@ -432,7 +437,26 @@ function createFakeBrowser(html, buildInfo) {
   };
 
   const fakeNavigator = { clipboard: { writeText: (text) => (clipboard.push(text), Promise.resolve()) } };
-  const fakeFetch = async () => ({ ok: true, json: async () => buildInfo });
+
+  /** 按 URL 分发的假 fetch：发布页只会读这两个本地文件，别的（Supabase）一律假装没配。 */
+  const storage = new Map();
+  const fakeFetch = async (url) => {
+    const path = String(url);
+    if (path.includes('download/latest.json')) return { ok: true, json: async () => buildInfo };
+    if (path.includes('content/leaderboard.json')) {
+      return {
+        ok: true,
+        json: async () => ({ format: 1, supabase: { url: '', anonKey: '', table: 'leaderboard' } }),
+      };
+    }
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+
+  const fakeLocalStorage = {
+    getItem: (key) => (storage.has(key) ? storage.get(key) : null),
+    setItem: (key, value) => storage.set(key, String(value)),
+    removeItem: (key) => storage.delete(key),
+  };
 
   return {
     byId,
@@ -444,8 +468,25 @@ function createFakeBrowser(html, buildInfo) {
     document: fakeDocument,
     navigator: fakeNavigator,
     fetch: fakeFetch,
+    localStorage: fakeLocalStorage,
     keydown: (key) => {
       for (const entry of documentListeners) if (entry.type === 'keydown') entry.handler({ key });
+    },
+    /** 把假 DOM 装到 globalThis 上（site.js 现在是 ES 模块，只能动态 import）。 */
+    install() {
+      const names = ['document', 'navigator', 'fetch', 'localStorage'];
+      const saved = Object.fromEntries(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+      const values = { document: fakeDocument, navigator: fakeNavigator, fetch: fakeFetch, localStorage: fakeLocalStorage };
+      // Node 里 navigator 是只读的 getter，直接赋值会抛 TypeError，所以走 defineProperty
+      for (const name of names) {
+        Object.defineProperty(globalThis, name, { value: values[name], configurable: true, writable: true });
+      }
+      return () => {
+        for (const name of names) {
+          if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
+          else delete globalThis[name];
+        }
+      };
     },
   };
 }
@@ -453,37 +494,45 @@ function createFakeBrowser(html, buildInfo) {
 test('点截图会放大、Esc 会关掉、复制按钮复制的是频道链接', async () => {
   const html = readDocs('index.html');
   const browser = createFakeBrowser(html, JSON.parse(readDocs('download/latest.json')));
-  const source = readDocs('assets/site.js');
 
-  // site.js 是没有 import 的普通脚本，用 new Function 在假 DOM 里跑一遍
-  const run = new Function('document', 'navigator', 'fetch', 'setTimeout', 'clearTimeout', source);
-  run(browser.document, browser.navigator, browser.fetch, setTimeout, clearTimeout);
+  // site.js 是 ES 模块（v3.1 起它 import 了排行榜那份纯逻辑），所以先把假 DOM 装上再动态 import
+  const restore = browser.install();
+  try {
+    await import(`${pathToFileURL(join(docsDir, 'assets', 'site.js')).href}?fake-dom=1`);
+    await tick();
+    await tick();
 
-  assert.equal(browser.shotButtons.length, 7, 'index.html 里的截图数量变了');
-  const lightbox = browser.byId.get('lightbox');
-  assert.equal(lightbox.hidden, true, '放大层初始应该是隐藏的');
+    assert.equal(browser.shotButtons.length, 7, 'index.html 里的截图数量变了');
+    const lightbox = browser.byId.get('lightbox');
+    assert.equal(lightbox.hidden, true, '放大层初始应该是隐藏的');
 
-  browser.shotButtons[0].dispatch('click');
-  assert.equal(lightbox.hidden, false, '点了截图应该弹出放大层');
-  assert.equal(browser.byId.get('lightbox-img').src, './assets/shots/setup.jpg');
-  assert.equal(browser.byId.get('lightbox-title').textContent, '开局构筑：角色模板 + 捏人');
+    browser.shotButtons[0].dispatch('click');
+    assert.equal(lightbox.hidden, false, '点了截图应该弹出放大层');
+    assert.equal(browser.byId.get('lightbox-img').src, './assets/shots/setup.jpg');
+    assert.equal(browser.byId.get('lightbox-title').textContent, '开局构筑：角色模板 + 捏人');
 
-  browser.keydown('Escape');
-  assert.equal(lightbox.hidden, true, 'Esc 应该关掉放大层');
+    browser.keydown('Escape');
+    assert.equal(lightbox.hidden, true, 'Esc 应该关掉放大层');
 
-  browser.copyButtons[0].dispatch('click');
-  await tick();
-  await tick();
-  assert.deepEqual(browser.clipboard, [CHANNEL_URL]);
-  assert.match(browser.byId.get('toast').textContent, /复制/);
+    browser.copyButtons[0].dispatch('click');
+    await tick();
+    await tick();
+    assert.deepEqual(browser.clipboard, [CHANNEL_URL]);
+    assert.match(browser.byId.get('toast').textContent, /复制/);
 
-  // latest.json 里的版本号 / 体积 / 校验和会自动填进页面
-  await tick();
-  const info = JSON.parse(readDocs('download/latest.json'));
-  assert.equal(browser.selectors['[data-version-badge]'][0].textContent, `v${info.version}`);
-  assert.equal(browser.selectors['[data-apk-size]'][0].textContent, `${Math.round(info.bytes / 1024)} KB`);
-  assert.equal(browser.selectors['[data-apk-sha]'][0].textContent, `${info.sha256.slice(0, 24)}…`);
-  assert.ok(Number(browser.selectors['[data-year]'][0].textContent) >= 2026);
+    // latest.json 里的版本号 / 体积 / 校验和会自动填进页面
+    const info = JSON.parse(readDocs('download/latest.json'));
+    assert.equal(browser.selectors['[data-version-badge]'][0].textContent, `v${info.version}`);
+    assert.equal(browser.selectors['[data-apk-size]'][0].textContent, `${Math.round(info.bytes / 1024)} KB`);
+    assert.equal(browser.selectors['[data-apk-sha]'][0].textContent, `${info.sha256.slice(0, 24)}…`);
+    assert.ok(Number(browser.selectors['[data-year]'][0].textContent) >= 2026);
+
+    // 排行榜没配后端时：不发 Supabase 请求，页面上给出"怎么接后端"的说明
+    assert.match(browser.byId.get('board-empty').textContent, /Supabase|后端/);
+    assert.match(browser.byId.get('board-note').textContent, /总分|图鉴/);
+  } finally {
+    restore();
+  }
 });
 
 test('打包脚本把「在线试玩副本 + APK + 清单 + zip」一次同步好', () => {

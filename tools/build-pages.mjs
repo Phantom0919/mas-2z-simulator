@@ -30,12 +30,15 @@ const DOCS = path.join(ROOT, 'docs');
 const DIST = path.join(ROOT, 'dist');
 
 /** 浏览器端的入口（和 build-apk.mjs 一致：APK 与发布页共享同一份模块图）。 */
-const WEB_ENTRIES = ['local-api.js', 'relations-view.js'];
+const WEB_ENTRIES = ['app.js', 'local-api.js', 'relations-view.js'];
 const REQUIRED_MODULES = [
   'src/engine.js',
   'src/rng.js',
   'src/story.js',
   'src/tree.js',
+  'src/leaderboard.js',
+  'src/update.js',
+  'src/content.js',
   'src/data/school.js',
   'src/data/character.js',
   'src/data/items.js',
@@ -154,6 +157,12 @@ function buildContentSource() {
   manifest.note = 'GitHub Pages 自带 CORS 头，所以手机上的离线版也能直接从这个地址检查更新。';
   writeFileSync(path.join(targetDir, 'update-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
   log(`推送源：docs/content/update-manifest.json（latest ${manifest.latest.version}，校验和 ${manifest.latest.checksum}）`);
+
+  // 排行榜后端配置：发布页和游戏读同一份文件（留空 = 只有本机榜，一个请求都不发）
+  const leaderboard = JSON.parse(readFileSync(path.join(sourceDir, 'leaderboard.json'), 'utf8'));
+  writeFileSync(path.join(targetDir, 'leaderboard.json'), `${JSON.stringify(leaderboard, null, 2)}\n`, 'utf8');
+  const configured = Boolean(leaderboard.supabase?.url && leaderboard.supabase?.anonKey);
+  log(`排行榜后端：${configured ? `已配置（${leaderboard.supabase.url}）` : '未配置（只有本机榜）'}`);
 }
 
 /* ------------------------------------------------------------ 4. 自检 */

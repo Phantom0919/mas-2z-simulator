@@ -1,4 +1,4 @@
-# 中二野人实验室 · v3.0
+# 中二野人实验室 · v3.1
 
 一个**零依赖的 Node.js 高中生活模拟器**（原名「马鞍山二中模拟器」，v3.0 起改名——
 搜不到校名，但"中二"两个字摆在那儿，玩的人一眼知道写的是哪所学校；
@@ -14,6 +14,16 @@
 > 游戏里的校名一律只写「二中」，不对应任何一所真实中学。
 
 ---
+
+## v3.1 新增了什么
+
+| 系统 | 内容 |
+| --- | --- |
+| 🏆 **排行榜** | 总分榜 + 收集榜；官网和游戏里都能看；第一次进游戏问昵称（只存本机，随时能改） |
+| 📴 **离线优先** | 没接后端就只有本机榜（刷新还在），**一个请求都不发**；断网 / 后端挂了自动降级 |
+| 🔒 **后端安全** | Supabase 免费版 + anon key（设计上公开），RLS 只给匿名 select / insert，改不了删不掉别人的记录 |
+| 🧾 **可复核** | 条目带随机种子 + 构筑摘要，同种子同构筑必然跑出同一局；同一昵称只留最好的一条，并列同名次 |
+| ✂️ **不加戏** | 排序/并列/去重全在 `src/leaderboard.js` 一份实现里，官网与游戏共用；客户端提交防不了作弊，也不假装能防 |
 
 ## v3.0 新增了什么
 
@@ -112,7 +122,7 @@ cd mas-2z-simulator
 
 npm start            # 终端版：进入开局向导（选科 / 天赋 / 背景 / 目标）
 npm run web          # 网页版：http://127.0.0.1:3210
-npm test             # 跑测试（引擎 + 服务端 + 前端 + 发布页，338 条）
+npm test             # 跑测试（引擎 + 服务端 + 前端 + 发布页，360 条）
 npm run sim          # 数值平衡报告（9 种策略批量跑）
 npm run gallery      # 查看结局图鉴与历史战绩
 npm run pages        # 生成 / 更新官方发布页（docs/）
@@ -196,6 +206,65 @@ node tools/serve-pages.mjs          # ③ 上传前先在本地看一遍（默�
   手写文件（`index.html` / `assets/style.css` / `assets/site.js`）不会被构建脚本覆盖。
 - **顺带的收益**：GitHub Pages 自带 CORS 头，所以 `docs/content/` 里的
   `update-manifest.json` + 内容包可以**直接当 v2.7 的推送源**（手机上的离线版也能直拉）。
+
+### 🏆 玩家排行榜（v3.1）
+
+GitHub Pages 是纯静态的，没有数据库——所以排行榜接的是 **Supabase 免费版**（Postgres + REST）。
+前端只放 **anon key**（Supabase 设计上公开的"publishable"密钥），门禁全在数据库的 RLS 策略里：
+匿名**只能读、只能插入，不能改也不能删**别人的记录。
+
+**没接后端时**：只有**本机榜**（存在 localStorage，刷新/关机再开都还在），页面**一个请求都不发**——
+和热更新一样是"离线优先"。断网、墙上、后端挂了，都只是降级成本机榜，绝不挡游戏。
+
+接后端（大约 5 分钟）：
+
+1. https://supabase.com 注册 → New project（免费版够用，区域挑离你近的）
+2. 左侧 **SQL Editor → New query** → 把 [`tools/leaderboard-schema.sql`](./tools/leaderboard-schema.sql) 整个粘进去 → Run
+3. 左侧 **Project Settings → API**：抄下 **Project URL** 和 **anon public key**
+4. 填进 [`web/content/leaderboard.json`](./web/content/leaderboard.json)：
+
+   ```json
+   {
+     "format": 1,
+     "supabase": {
+       "url": "https://xxxxxxxxxxxx.supabase.co",
+       "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9....",
+       "table": "leaderboard"
+     }
+   }
+   ```
+
+5. `npm run pages && npm run apk` → 发布页和 APK 都读同一份配置（游戏里走的也是这个地址）。
+
+**接完一定要跑一次自检**：
+
+```bash
+node tools/check-leaderboard.mjs
+```
+
+它会读一次榜单、写一条「自检员」记录、再试着**改分数**和**删记录**（这两步必须失败，说明 RLS 生效了），
+最后打印清理用的 SQL：`delete from public.leaderboard where nickname = '自检员';`
+
+> ⚠️ **国内网络的一个现实问题**：`*.supabase.co` 挂在 Cloudflare 上，部分网络会**按 SNI 阻断**
+> （TCP 能连上、TLS 握手被重置）——本项目的开发机就是这种情况，`node tools/check-leaderboard.mjs`
+> 会直接报 `unreachable`。**游戏本身不受影响**：读不到就退回本机榜，玩家照常玩，只是看不到全服榜。
+> 如果全服榜对你很重要，可选：给 Supabase 配自定义域名（付费功能，需要自己有域名）、
+> 或者换成国内后端（腾讯云开发 / 自建 + 备案域名）。
+
+| 榜 | 排序规则 | 给谁看 |
+| --- | --- | --- |
+| 🎯 **总分榜** | 高考总分 → 年级名次 → 成就数 | 追分数的人；每行带难度徽章（难度不同分数不可比） |
+| 📖 **收集榜** | 结局图鉴解锁数 → 成就收录数 → 总分 | 多周目玩家；两条线都排 |
+
+几条刻意的设计：
+
+- **同一个昵称只留最好的一条**——不然一个人打十局就把榜刷满了；
+- **并列同名次**，下一位按真实条数继续（1、1、3）；
+- **可复核**：条目里带随机种子和构筑摘要，同种子同构筑必然跑出同一局。这是这个项目能给的最高等级公信力；
+- **诚实**：客户端提交的成绩**防不了作弊**，我没有假装能防。数据库那层只做范围校验（分数 0~750、昵称 1~16 字、模式枚举）——
+  它的作用是挡住手滑和脏数据，不是挡住有心人；
+- 榜单脏了你自己清（控制台执行）：`delete from public.leaderboard where id in (...);`
+- 排序 / 并列 / 去重全在 [`src/leaderboard.js`](./src/leaderboard.js) 里，**官网和游戏共用同一份**，不会两处各写一遍。
 
 ### 热更新：怎么把新内容装上
 
@@ -684,6 +753,8 @@ run_class:    { grade: [1], note: '班干部竞选只在高一' },
 │       ├── events6.js     # 21 个因果链事件（8 条链）+ 8 个链式成就
 │       └── colleges.js    # 志愿填报：24 个专业、投档线波动、平行志愿与调剂规则
 │   ├── content.js         # 内容包（热更新）纯数据层：校验 / 合并 / 摘要 / 校验和
+│   ├── update.js          # 推送（更新清单）纯数据层：地址护栏 / 清单校验 / 决策矩阵
+│   └── leaderboard.js     # 排行榜纯数据层：昵称规范化 / 条目校验 / 两个榜的排序与并列 / Supabase 读写
 ├── web/
 │   ├── index.html
 │   ├── style.css
@@ -725,8 +796,9 @@ run_class:    { grade: [1], note: '班干部竞选只在高一' },
 │   ├── module-graph.mjs  # 顺着 import 收集浏览器要用的模块（APK / 发布页 / 测试共用同一份逻辑）
 │   ├── preview-relations.mjs  # 把关系树 SVG / 故事线 HTML 落到 build/preview 供人眼检查
 │   ├── svg-preview.py    # 用 Pillow 把关系树 SVG 画成 PNG（没有浏览器时看排版用）
-│   ├── build-pages.mjs   # 生成发布页：试玩副本 + APK + 推送源 + 可上传的 zip（零依赖写法）
+│   ├── build-pages.mjs   # 生成发布页：试玩副本 + APK + 推送源 + 排行榜配置 + 可上传的 zip（零依赖写法）
 │   ├── build-pages-shots.py  # 截图转 JPEG + 生成 OG 分享图（需要 Pillow）
+│   ├── leaderboard-schema.sql  # 排行榜建表 SQL（Supabase：建表 + 索引 + RLS 只读只插）
 │   ├── serve-pages.mjs   # 本地预览发布页（正确 MIME、APK 可下载、手机可连）
 │   ├── android-sdk.mjs   # 一键装 Android SDK（不需要 Android Studio / Gradle）
 │   ├── build-apk.mjs     # 免 Gradle 直接出 APK（aapt2 + javac + d8 + zipalign + apksigner）
@@ -751,11 +823,14 @@ run_class:    { grade: [1], note: '班干部竞选只在高一' },
     │                     #   在线试玩真打一局 / 假 DOM 点一遍放大与复制 / 体积预算 / 无 BOM）
     ├── community.test.js # 10 个 v2.9 交流面板测试（三个入口 / 地址单一真源 / 复制兜底 /
     │                     #   结局分享文案 / 安卓外链交给系统 / APK 内容登记）
-    └── versus.test.js    # 18 个 v3.0 AI 对战测试（时间线逐拍对齐 / 随机流隔离 / 可复现 /
-                          #   考试同榜 / 强度阶梯 / 结局总结 / 等效分 / 存档往返 / 两端接口 / CLI）
+    ├── versus.test.js    # 18 个 v3.0 AI 对战测试（时间线逐拍对齐 / 随机流隔离 / 可复现 /
+    │                     #   考试同榜 / 强度阶梯 / 结局总结 / 等效分 / 存档往返 / 两端接口 / CLI）
+    └── leaderboard.test.js # 22 个 v3.1 排行榜测试（昵称规范化 / 条目校验 / 两个榜的排序与并列 /
+                            #   同昵称去重 / 可复核文案 / 假 Supabase 端到端 / 没配后端不发请求 /
+                            #   403 与断网降级 / 界面与打包守门 / RLS 不许有 update·delete）
 ```
 
-一共 **338 个测试**，`npm test` 全部通过（成品包的布局检查在没有产物时会自动跳过）。
+一共 **360 个测试**，`npm test` 全部通过（成品包的布局检查在没有产物时会自动跳过）。
 其中最有用的一个是 `android.test.js` 的最后一条：它把打好的 APK **解包**，
 直接 import 里面那份 `local-api.js` 打一局（含高考后的志愿填报）—— 只要 APK 少打包了任何一个模块，
 测试就会红，而不是等用户装到手机上看到白屏。
@@ -812,8 +887,8 @@ index.html?demo=60&mode=versus&rival=hard&weeks=3&volunteers=0
 
 | 产物 | 命令 | 大小 | 用途 |
 | --- | --- | --- | --- |
-| `dist/中二野人实验室-3.0.0-debug.apk` | `npm run apk` | 0.48 MB | 安卓侧载包（含热更新 + 推送 + 交流入口 + AI 对战） |
-| `dist/中二野人实验室-3.0.0-发布页.zip` | `npm run pages` | 1.4 MB | 官方发布页：解压后推到 GitHub Pages（含在线试玩 + APK） |
+| `dist/中二野人实验室-3.1.0-debug.apk` | `npm run apk` | 0.49 MB | 安卓侧载包（含热更新 + 推送 + 交流入口 + AI 对战 + 排行榜） |
+| `dist/中二野人实验室-3.1.0-发布页.zip` | `npm run pages` | 1.4 MB | 官方发布页：解压后推到 GitHub Pages（含在线试玩 + 排行榜 + APK） |
 | `dist/desktop/…-安装版.exe` | `npm run installer` | 78 MB | Windows：双击安装，带向导/快捷方式/卸载 |
 | `dist/desktop/…-win-x64.zip` | `npm run desktop:portable` | 110 MB | Windows：免安装绿色版，解压即玩 |
 
@@ -907,8 +982,9 @@ v2.1 的存档里没有人物阵容和剧情记录，读进来会按种子把同
   代词用 `${cast.deskmate.ta}`，**不要写死"张昊""王老师"**——那些名字每局都不一样
   （而且玩家可以自己给同桌起名，写死了就会串戏）。
   `week` 是"第几周之后才能触发"，一条线里要保持递增。
-- **调平衡之外别忘的三件事**：`npm test`（338 个测试，包含剧情结构、姓名生成、
-  自制人物、内容包、事件日历、AI 对战的时间线与随机流隔离，以及发布页的链接 / 素材 / 交互守门测试）、
+- **调平衡之外别忘的三件事**：`npm test`（360 个测试，包含剧情结构、姓名生成、
+  自制人物、内容包、事件日历、AI 对战的时间线与随机流隔离、排行榜的排序与后端降级，
+  以及发布页的链接 / 素材 / 交互守门测试）、
   `python tools/build-pages-shots.py && node tools/build-pages.mjs`（界面改过之后重出发布页素材与产物）、
   `node tools/preview-relations.mjs` + `python tools/svg-preview.py`（不用开浏览器就能看关系树排版）。
 - **不知道该做什么的时候**：翻 [ROADMAP.md](./ROADMAP.md)，那里按 P0/P1/P2 排了短期 / 中期 / 长期建议，

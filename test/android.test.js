@@ -240,12 +240,15 @@ test('浏览器模块图能收全新模块，且不含 Node 专用文件', async
   const root = fileURLToPath(new URL('..', import.meta.url));
   const { modules, problems } = collectModulesChecked({
     root,
-    entries: ['local-api.js', 'relations-view.js'].map((name) => path.join(root, 'web', name)),
+    // app.js 是页面真正的入口；v3.1 起它 import 了排行榜模块，必须一起收
+    entries: ['app.js', 'local-api.js', 'relations-view.js'].map((name) => path.join(root, 'web', name)),
     required: [
       'src/engine.js',
       'src/rng.js',
       'src/story.js',
       'src/tree.js',
+      'src/leaderboard.js',
+      'src/update.js',
       'src/data/school.js',
       'src/data/character.js',
       'src/data/items.js',

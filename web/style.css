@@ -3003,6 +3003,142 @@ button,
   }
 }
 
+/* ---------- 🏆 排行榜（v3.1） ---------- */
+
+.leaderboard-nick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+
+.leaderboard-nick label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.leaderboard-nick input {
+  min-width: 180px;
+}
+
+/* 两个榜的切换标签：长得和行动的 tab 一致，但独立一套类名免得互相影响 */
+.tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 6px;
+}
+
+.tab-row .tab {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.tab-row .tab.on {
+  color: var(--text);
+  border-color: var(--brand-2);
+  background: rgba(47, 129, 247, 0.12);
+}
+
+.leaderboard-list {
+  margin: 12px 0 4px;
+  min-height: 60px;
+}
+
+.board-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-height: 46vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.board-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(15, 21, 29, 0.55);
+}
+
+.board-row.tied {
+  border-color: rgba(63, 185, 80, 0.35);
+}
+
+.board-position {
+  flex: 0 0 34px;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-2);
+  padding-top: 2px;
+}
+
+.board-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.board-name {
+  font-weight: 600;
+}
+
+.board-name i {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--brand);
+  margin-left: 4px;
+}
+
+.board-ending {
+  font-size: 13px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.board-meta {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.board-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.board-badge.versus {
+  color: var(--purple);
+  border-color: rgba(188, 140, 255, 0.4);
+}
+
+@media (max-width: 560px) {
+  .board-list {
+    max-height: none;
+  }
+
+  .board-position {
+    flex: 0 0 26px;
+  }
+}
+
 /* ---------- 减弱动态效果 ---------- */
 
 /*

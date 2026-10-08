@@ -99,6 +99,16 @@ CHECKS = [
     ("assets/www/app.js", "renderModes", None),
     ("assets/www/app.js", "versusEndingHtml", None),
     ("assets/www/local-api.js", "rivalLevel", None),
+    # v3.1：排行榜（昵称 + 两个榜 + 后端配置）必须一起进包，而且默认必须是"没接后端"
+    ("assets/src/leaderboard.js", "LEADERBOARD_METRICS", None),
+    ("assets/src/leaderboard.js", "submitEntry", None),
+    ("assets/www/index.html", 'id="nickname-modal"', None),
+    ("assets/www/index.html", 'id="leaderboard-modal"', None),
+    ("assets/www/index.html", 'id="btn-ending-leaderboard"', None),
+    ("assets/www/app.js", "recordLeaderboardRun", None),
+    ("assets/www/app.js", "submitCurrentRun", None),
+    ("assets/www/style.css", ".board-row", None),
+    ("assets/www/content/leaderboard.json", '"table": "leaderboard"', None),
 ]
 
 

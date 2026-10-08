@@ -72,6 +72,7 @@
         <button id="btn-gallery" class="ghost" title="跨局收集的结局图鉴">📖 图鉴</button>
         <button id="btn-content" class="ghost" title="导入内容包：加事件、加道具、调平衡，不用重装">🔄 内容包</button>
         <button id="btn-community" class="ghost" title="加入腾讯频道【模拟器发布页】：版本发布、玩法讨论、报 bug；也在这里写关于我们">💬 交流</button>
+        <button id="btn-leaderboard" class="ghost" title="全服排行榜：总分榜 / 收集榜；第一次进来会让你起个昵称">🏆 排行榜</button>
         <button id="btn-save" class="ghost" title="导出存档文件">💾 导出</button>
         <button id="btn-load" class="ghost" title="导入存档文件">📂 导入</button>
         <button id="btn-new" class="primary">🔄 新的一局</button>
@@ -484,6 +485,47 @@
       </div>
     </div>
 
+    <!-- ---------- 🏆 排行榜 ---------- -->
+    <div class="overlay hidden" id="leaderboard-modal">
+      <div class="card wide-card">
+        <div class="event-title">🏆 排行榜</div>
+        <p class="muted small" id="leaderboard-status"></p>
+
+        <div class="leaderboard-nick">
+          <label>榜单昵称 <input id="input-nickname-board" maxlength="16" placeholder="最多 16 个字" /></label>
+          <button type="button" id="btn-save-nickname" class="ghost">保存昵称</button>
+        </div>
+
+        <div class="tab-row" id="leaderboard-tabs"></div>
+        <p class="muted small" id="leaderboard-note"></p>
+        <div class="leaderboard-list" id="leaderboard-body"></div>
+
+        <div class="start-actions">
+          <button type="button" id="btn-leaderboard-refresh" class="ghost">🔄 刷新</button>
+          <button type="button" id="btn-leaderboard-submit" class="primary">🏆 把这一局上榜</button>
+          <button type="button" id="btn-leaderboard-close" class="ghost">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 第一次进来：问昵称 ---------- -->
+    <div class="overlay hidden" id="nickname-modal">
+      <div class="card">
+        <div class="event-title">👋 怎么称呼你？</div>
+        <p class="muted">
+          起个昵称吧——它会显示在排行榜上。只存在你自己的设备里，不会上传别的东西；
+          想跳过也行，之后在「🏆 排行榜」里随时改。
+        </p>
+        <div class="form-grid">
+          <label>昵称 <input id="input-nickname-first" maxlength="16" placeholder="例如：雨山湖的鱼" /></label>
+        </div>
+        <div class="start-actions">
+          <button type="button" id="btn-nickname-save" class="primary">就叫这个</button>
+          <button type="button" id="btn-nickname-skip" class="ghost">先跳过</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ---------- 结局 ---------- -->
     <div class="overlay hidden" id="ending-modal">
       <div class="card ending-card">
@@ -491,6 +533,7 @@
         <div class="start-actions">
           <button id="btn-restart" class="primary big">再来一局</button>
           <button id="btn-ending-share" class="ghost big">📣 分享这一局</button>
+          <button id="btn-ending-leaderboard" class="ghost big">🏆 上榜</button>
           <button id="btn-ending-gallery" class="ghost big">📖 查看图鉴</button>
         </div>
       </div>
