@@ -26,6 +26,10 @@
   （这两步**必须失败**）→ 再读一次确认在榜上，最后打印清理用的 SQL。
 - 一句实话：`*.supabase.co` 走 Cloudflare，**部分国内网络会按 SNI 阻断**（TCP 通、TLS 被重置）。
   开发机上就是这样，所以"全服榜"在这些网络里看不到——但游戏不受影响，自动退回本机榜。
+- 附赠 [`tools/cloudflare/`](./tools/cloudflare/README.md)：一个 Cloudflare Worker 反向代理
+  （把排行榜套在自己域名后面，绕开 SNI 阻断；保留 Supabase 与 RLS，前端只改配置里的 `url`），
+  含 10 分钟部署说明；代理是白名单化的（只转发 GET/POST、只认 `/rest/v1/<表>` 这一个路径段），
+  边界由 `test/cloudflare.test.js` 10 条测试盯着（假上游，不联网）。
 - **没配后端就一个请求都不发**：只有本机榜，界面写明"怎么接后端"。
   配置位于 `web/content/leaderboard.json`（默认留空），发布页和 APK 读同一份。
 - **读不到就降级**：断网、墙上、Supabase 挂了，都退回本机榜 + 一句 toast，绝不挡游戏。
