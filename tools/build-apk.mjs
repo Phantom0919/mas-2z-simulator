@@ -308,7 +308,7 @@ function signApk(tools, alignedApk, version) {
   log('6/6 签名（apksigner）');
   const keystore = ensureKeystore();
   mkdirSync(DIST_DIR, { recursive: true });
-  const output = path.join(DIST_DIR, `马鞍山二中模拟器-${version}-debug.apk`);
+  const output = path.join(DIST_DIR, `中二野人实验室-${version}-debug.apk`);
   rmSync(output, { force: true });
   run(javaBin(), [
     '-jar', rel(tools.apksignerJar),

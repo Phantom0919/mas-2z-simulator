@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  马鞍山二中模拟器 · Android 客户端
+  中二野人实验室 · Android 客户端
 
   页面通过 https://mas2z.local/ 这个虚拟域名加载，由 MainActivity 用
   shouldInterceptRequest 从 assets 里直接读文件返回。
@@ -9,8 +9,8 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.mas2z.simulator"
-    android:versionCode="20900"
-    android:versionName="2.9.0">
+    android:versionCode="30000"
+    android:versionName="3.0.0">
 
     <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
 

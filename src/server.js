@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 马鞍山二中模拟器 · 网页版服务端（零依赖，只用 node:http）
+ * 中二野人实验室 · 网页版服务端（零依赖，只用 node:http）
  *
  *   node src/server.js                 默认 http://127.0.0.1:3210
  *   node src/server.js --port 8080
@@ -365,6 +365,11 @@ export function createGameServer({
           preset: body.preset,
           customCast: body.customCast,
           endless: body.endless,
+          // v3.0 玩法：单人 / AI 对战（AI 强度见 RIVAL_LEVELS）
+          mode: body.mode,
+          rivalLevel: body.rivalLevel,
+          // 高考之后要不要走志愿填报（分享"最短一局"的链接会关掉；默认开着）
+          volunteers: body.volunteers,
         });
         const gameId = store.create(game);
         sendJson(res, 200, { gameId, lines: [], view: viewState(game) });
@@ -679,7 +684,7 @@ if (isMain) {
   );
   server.listen(port, host, () => {
     const address = server.address();
-    console.log(`马鞍山二中模拟器 · 网页版已启动： http://${host}:${address.port}`);
+    console.log(`中二野人实验室 · 网页版已启动： http://${host}:${address.port}`);
     console.log('按 Ctrl+C 结束。');
   });
   const shutdown = () => {

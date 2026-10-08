@@ -179,7 +179,7 @@ test('Android 工程文件齐全，Manifest 指向正确入口', () => {
   }
 
   const strings = read('android/app/res/values/strings.xml');
-  assert.match(strings, /马鞍山二中模拟器/);
+  assert.match(strings, /中二野人实验室/);
 });
 
 test('适配全面屏：刘海 / 安全区 / 自适应缩放都配好了', () => {
@@ -295,7 +295,7 @@ test('SDK 安装脚本不依赖 Android Studio 与 Gradle', () => {
 
 test('PWA 清单与图标齐备，可"添加到主屏幕"', () => {
   const manifest = JSON.parse(read('web/manifest.webmanifest'));
-  assert.equal(manifest.name, '马鞍山二中模拟器');
+  assert.equal(manifest.name, '中二野人实验室');
   assert.equal(manifest.display, 'standalone');
   assert.equal(manifest.start_url, './index.html');
   const sizes = manifest.icons.map((icon) => icon.sizes);

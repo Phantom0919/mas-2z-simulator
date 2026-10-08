@@ -6,7 +6,7 @@
 /**
  * @param {{ appName: string, onCommand: (command: string) => void, isDev?: boolean, openReadme?: () => void, showAbout?: () => void }} options
  */
-export function buildMenuTemplate({ appName = '马鞍山二中模拟器', onCommand = () => {}, isDev = false, openReadme, showAbout } = {}) {
+export function buildMenuTemplate({ appName = '中二野人实验室', onCommand = () => {}, isDev = false, openReadme, showAbout } = {}) {
   return [
     {
       label: '游戏',

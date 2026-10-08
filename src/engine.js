@@ -1,5 +1,5 @@
 /**
- * 马鞍山二中模拟器 · 核心引擎 v2
+ * 中二野人实验室 · 核心引擎 v2
  *
  * 纯逻辑、零依赖：CLI、网页服务、平衡脚本、测试都调用这一份引擎。
  *
@@ -99,7 +99,7 @@ import {
 /** 存档格式版本（结构变了才动它）。 */
 export const VERSION = 2;
 /** 游戏版本。内容包的 `requires.app` 拿它做兼容判断；和 package.json 必须一致（有测试盯着）。 */
-export const GAME_VERSION = '2.9.0';
+export const GAME_VERSION = '3.0.0';
 
 /* ------------------------------------------------------- 内容（可热更新） */
 
@@ -562,8 +562,457 @@ export function creatorOptions() {
     subjects: SUBJECT_POOL,
     maxTraits: EFF.maxTraits,
     maxFlaws: EFF.maxFlaws,
+    /** 玩法：单人 / AI 对战（v3.0） */
+    modes: MODES,
+    /** AI 强度档（选 AI 对战时才有意义） */
+    rivalLevels: Object.values(RIVAL_LEVELS),
   };
 }
+
+/* ---------------------------------------------------------- AI 对战（v3.0） */
+
+/**
+ * 两种玩法。
+ *
+ * AI 对战不是"另一个游戏"：**引擎里真的开了第二局**，用的是同一套规则
+ * （同一个 createGame / performAction / resolveEvent），只是每一拍的选择由
+ * BOT_PLANS 里的策略决定。所以 AI 的分数是打出来的，不是编出来的；
+ * 排行榜用的是同一套 rankFromScore（同级 1000 人），两个人的名次可以直接比。
+ */
+export const MODES = [
+  {
+    key: 'solo',
+    name: '单人模式',
+    icon: '🎮',
+    desc: '只有你自己。想怎么玩就怎么玩，随时存档读档。',
+  },
+  {
+    key: 'versus',
+    name: 'AI 对战',
+    icon: '⚔️',
+    desc: '隔壁班安排一个同学，同一套规则打满三年，每次考试和你同榜比名次，最后比结局。',
+  },
+];
+
+/**
+ * AI 强度：决定它"有多拼"（用哪套打法）+ 多拿几点属性点。
+ *
+ * 刻意不做成"AI 作弊"：它的分数一样来自知识、心情、疲劳、遗忘那一套曲线；
+ * 高难度只是更会规划（补最弱科、考前突击、维持状态）并且开局多点属性点。
+ */
+export const RIVAL_LEVELS = {
+  easy: {
+    key: 'easy',
+    name: '轻松',
+    icon: '😴',
+    plan: 'casual',
+    bonusPoints: 0,
+    style: '陪跑型',
+    desc: '佛系打法：一周大概只认真学一段，其余时间在打球、看闲书。',
+  },
+  normal: {
+    key: 'normal',
+    name: '普通',
+    icon: '🙂',
+    plan: 'balanced',
+    bonusPoints: 0,
+    style: '均衡型',
+    desc: '学一半玩一半，状态差会休息，属于正常发挥的同班同学。',
+  },
+  hard: {
+    key: 'hard',
+    name: '困难',
+    icon: '😤',
+    plan: 'diligent',
+    bonusPoints: 2,
+    style: '卷王型',
+    desc: '补最弱的一科、考前突击、状态一低就调整，而且开局多 2 点属性点。',
+  },
+  real: {
+    key: 'real',
+    name: '真实',
+    icon: '🔥',
+    plan: 'olympiad',
+    bonusPoints: 4,
+    style: '竞赛型',
+    desc: '走竞赛保送路线，开局多 4 点属性点。它的高考分未必比你高——但它有可能根本不用高考。',
+  },
+};
+
+export const DEFAULT_RIVAL_LEVEL = 'normal';
+
+/** AI 选事件的偏好（和 tools 的自动对局同一套思路；不共用文件是为了避免循环 import）。 */
+const BOT_EVENT_PREFERENCE = ['run', 'honest', 'admit', 'rest', 'sleep', 'refuse', 'return', 'go', 'notes', 'pass', 'study', 'ask_classmate', 'report_it'];
+
+function botEventChoice(pending) {
+  const choices = pending?.choices ?? [];
+  if (choices.length === 0) return null;
+  for (const id of BOT_EVENT_PREFERENCE) {
+    const hit = choices.find((choice) => choice.id === id);
+    if (hit) return hit.id;
+  }
+  return choices[0].id;
+}
+
+function botActions(game, phase) {
+  const map = new Map();
+  for (const action of listActions(game, phase)) map.set(action.id, action);
+  return map;
+}
+
+function botPick(actions, ...ids) {
+  for (const id of ids) {
+    const action = actions.get(id);
+    if (action?.available) return action;
+  }
+  return null;
+}
+
+function botWrap(action, subject) {
+  if (!action) return { actionId: 'listen' };
+  if (action.needsSubject) return { actionId: action.id, subject: subject ?? action.subjectOptions?.[0]?.key };
+  return { actionId: action.id };
+}
+
+function botWeakestSubject(game) {
+  const keys = (game.subjectKeys ?? []).slice().sort((a, b) => (game.knowledge[a] ?? 0) - (game.knowledge[b] ?? 0));
+  return keys[0] ?? 'math';
+}
+
+function botStrongestSubject(game) {
+  const keys = (game.subjectKeys ?? []).slice().sort((a, b) => (game.knowledge[b] ?? 0) - (game.knowledge[a] ?? 0));
+  return keys[0] ?? 'math';
+}
+
+/** 状态维护：疲劳/心情/体质/钱。阈值跟 EFF 的曲线对齐——过 45 疲劳就开始亏效率。 */
+function botMaintenance(actions, game) {
+  if (game.stats.fatigue >= 58) return botWrap(botPick(actions, 'sleep', 'sport'));
+  if (game.stats.mood <= 60) return botWrap(botPick(actions, 'canteen', 'family_time', 'social', 'sport', 'sleep'));
+  if (game.stats.physique <= 45) return botWrap(botPick(actions, 'sport', 'canteen'));
+  if (game.stats.money < 180 && botPick(actions, 'tutor_job', 'work')) {
+    return botWrap(botPick(actions, 'tutor_job', 'work'), botStrongestSubject(game));
+  }
+  return null;
+}
+
+function botStudy(actions, game, phase) {
+  const exam = nextExamInfo(game);
+  const weakest = botWeakestSubject(game);
+  const weekend = phase === 'weekend';
+  if (exam && exam.inWeeks <= 1) {
+    return botWrap(
+      weekend ? botPick(actions, 'cram', 'drill', 'review_notes', 'tutor') : botPick(actions, 'cram', 'drill', 'listen', 'review_notes'),
+      weakest,
+    );
+  }
+  if (weekend) return botWrap(botPick(actions, 'drill', 'study_together', 'review_notes', 'tutor', 'ask_teacher', 'help'), weakest);
+  return botWrap(botPick(actions, 'listen', 'drill', 'review_notes', 'preview'), weakest);
+}
+
+/** 四套打法。都只看 game 和 phase，所以同一个局面的选择是确定的（存档/读档不会变卦）。 */
+const BOT_PLANS = {
+  casual(game, phase) {
+    const actions = botActions(game, phase);
+    if (game.stats.fatigue >= 78) return botWrap(botPick(actions, 'sleep', 'canteen'));
+    if (game.stats.mood <= 35) return botWrap(botPick(actions, 'canteen', 'social', 'family_time', 'sleep'));
+    if (game.turn % 3 === 0) return botStudy(actions, game, phase);
+    return botWrap(botPick(actions, 'sport', 'read', 'social', 'game', 'club', 'family_time')) ?? botStudy(actions, game, phase);
+  },
+  balanced(game, phase) {
+    const actions = botActions(game, phase);
+    const maintenance = botMaintenance(actions, game);
+    if (maintenance) return maintenance;
+    const cycle = game.turn % 4;
+    if (cycle === 0 || cycle === 2) return botStudy(actions, game, phase);
+    if (cycle === 1) return botWrap(botPick(actions, 'drill', 'help', 'study_together'), botWeakestSubject(game));
+    return botWrap(botPick(actions, 'sport', 'club', 'volunteer', 'social', 'family_time', 'read')) ?? botStudy(actions, game, phase);
+  },
+  diligent(game, phase) {
+    const actions = botActions(game, phase);
+    const maintenance = botMaintenance(actions, game);
+    if (maintenance) return maintenance;
+    if (game.turn % 4 === 3 && (game.stats.fatigue >= 45 || game.stats.mood <= 72)) {
+      const rest = botWrap(botPick(actions, 'sport', 'canteen', 'family_time', 'club'));
+      if (rest.actionId !== 'listen') return rest;
+    }
+    const stage = game.flags.contestStage ?? 0;
+    if (stage >= 3 && stage < 5 && game.turn % 5 === 2 && actions.get('contest')?.available) {
+      return { actionId: 'contest', subject: botStrongestSubject(game) };
+    }
+    return botStudy(actions, game, phase);
+  },
+  olympiad(game, phase) {
+    const actions = botActions(game, phase);
+    const maintenance = botMaintenance(actions, game);
+    if (maintenance) return maintenance;
+    const exam = nextExamInfo(game);
+    const stage = game.flags.contestStage ?? 0;
+    if (stage < 5 && actions.get('contest')?.available && (exam === null || exam.inWeeks > 1) && game.turn % 5 !== 4) {
+      return { actionId: 'contest', subject: botStrongestSubject(game) };
+    }
+    return botStudy(actions, game, phase);
+  },
+};
+
+function botPlan(game, phase, levelKey) {
+  const level = RIVAL_LEVELS[levelKey] ?? RIVAL_LEVELS[DEFAULT_RIVAL_LEVEL];
+  return (BOT_PLANS[level.plan] ?? BOT_PLANS.balanced)(game, phase);
+}
+
+/**
+ * 建一个 AI 对局。
+ *
+ * 同一个种子（`<seed>|rival`）+ 同样的难度、选科、周数，但**名字不同**，
+ * 所以两个 game 的事件流互相独立（不会照镜子），而分数的口径完全一样。
+ */
+function createRivalGame({ seedText, difficulty, custom, weeksPerSemester, track, electives, levelKey }) {
+  const level = RIVAL_LEVELS[levelKey] ?? RIVAL_LEVELS[DEFAULT_RIVAL_LEVEL];
+  const build = {
+    easy: { traits: ['easygoing', 'social'], personality: 'plain', goal: 'happy' },
+    normal: { traits: ['memory', 'easygoing'], personality: 'steady', goal: 'yiben' },
+    hard: { traits: ['memory', 'nightowl'], personality: 'sharp', goal: 'c985' },
+    real: { traits: ['memory', 'talent'], personality: 'sharp', goal: 'baosong' },
+  }[level.key] ?? { traits: ['memory', 'easygoing'], personality: 'plain', goal: 'yiben' };
+
+  return createGame({
+    seed: `${seedText}|rival`,
+    difficulty,
+    custom,
+    weeksPerSemester,
+    track,
+    electives,
+    traits: build.traits,
+    personality: build.personality,
+    goal: build.goal,
+    // AI 强度补偿走传承点通道（属性点的唯一入口），高难度多几点
+    legacyPoints: level.bonusPoints,
+    mode: 'solo',
+    depth: 1,
+  });
+}
+
+/**
+ * 让 AI 打一拍（一个阶段：主行动或周末）。
+ *
+ * 事件由 AI 自己选（当场选完），所以**一次调用只消耗一个阶段**，
+ * 和玩家的节奏天然对齐——不需要额外的计数器去追进度。
+ */
+function advanceRivalPhase(game, phase) {
+  const versus = game.versus;
+  if (!versus?.rival) return;
+  const rival = versus.rival;
+  if (rival.status !== 'playing' || rival.phase !== phase) return;
+
+  const plan = botPlan(rival, phase, versus.level);
+  try {
+    performAction(rival, plan.actionId, plan.subject ? { subject: plan.subject } : {});
+  } catch {
+    return; // AI 的选择理论上不会非法；真出了意外就跳过这一拍，绝不把玩家的局带崩
+  }
+  let guard = 0;
+  while (rival.pendingEvent && rival.status === 'playing' && guard < 4) {
+    guard += 1;
+    const choiceId = botEventChoice(rival.pendingEvent);
+    if (!choiceId) break;
+    try {
+      resolveEvent(rival, choiceId);
+    } catch {
+      break;
+    }
+  }
+  reportRivalExam(game, rival);
+}
+
+/** 同一场考试两边都考完了，就往玩家日志里塞一条对比——对战模式的存在感靠它。 */
+function reportRivalExam(game, rival) {
+  const me = game.exams.at(-1);
+  const ai = rival.exams.at(-1);
+  if (!me || !ai || me.name !== ai.name) return;
+  const versus = game.versus;
+  if (!versus) return;
+  versus.reported ??= [];
+  if (versus.reported.includes(me.name)) return;
+  versus.reported.push(me.name);
+
+  const lead = me.total - ai.total;
+  const tail =
+    lead === 0
+      ? '打平。'
+      : lead > 0
+        ? `你领先 ${lead} 分。`
+        : `你落后 ${Math.abs(lead)} 分。`;
+  pushLog(
+    game,
+    'system',
+    `⚔️ ${me.name}对战结果`,
+    `${game.student.name}：${me.total} 分（年级第 ${me.rank} 名）\n` +
+      `${rival.student.name}：${ai.total} 分（年级第 ${ai.rank} 名）\n${tail}`,
+  );
+}
+
+/** 玩家这一局结束了：让 AI 也把三年走完，这样结局页的对比才是公平的。 */
+function settleRival(game) {
+  const versus = game.versus;
+  if (!versus?.rival) return;
+  const rival = versus.rival;
+  let guard = 0;
+  while (rival.status !== 'ended' && guard < 400) {
+    guard += 1;
+    if (rival.status === 'volunteering') {
+      try {
+        const auto = autoFillVolunteers(rival, 'balanced');
+        submitVolunteers(rival, auto.picks, { adjust: auto.adjust });
+      } catch {
+        break;
+      }
+      continue;
+    }
+    if (rival.status !== 'playing') break;
+    if (rival.pendingEvent) {
+      const choiceId = botEventChoice(rival.pendingEvent);
+      if (!choiceId) break;
+      try {
+        resolveEvent(rival, choiceId);
+      } catch {
+        break;
+      }
+      continue;
+    }
+    const plan = botPlan(rival, rival.phase, versus.level);
+    try {
+      performAction(rival, plan.actionId, plan.subject ? { subject: plan.subject } : {});
+    } catch {
+      break;
+    }
+    // performAction 留下的待处理事件，下一圈处理
+    if (rival.pendingEvent) {
+      const choiceId = botEventChoice(rival.pendingEvent);
+      if (choiceId) {
+        try {
+          resolveEvent(rival, choiceId);
+        } catch {
+          break;
+        }
+      }
+    }
+  }
+}
+
+/** 两个人在同一张榜上的对比（考前是 null，考试后才出现）。 */
+function versusRecords(game) {
+  const versus = game.versus;
+  if (!versus?.rival) return [];
+  const rival = versus.rival;
+  const records = [];
+  const count = Math.min(game.exams.length, rival.exams.length);
+  for (let i = 0; i < count; i += 1) {
+    const me = game.exams[i];
+    const ai = rival.exams[i];
+    if (me.name !== ai.name) continue;
+    records.push({
+      name: me.name,
+      kind: me.kind ?? 'exam',
+      semesterIndex: me.semesterIndex ?? null,
+      you: { total: me.total, rank: me.rank },
+      ai: { total: ai.total, rank: ai.rank },
+      diff: me.total - ai.total,
+      winner: me.total === ai.total ? 'tie' : me.total > ai.total ? 'you' : 'rival',
+    });
+  }
+  return records;
+}
+
+function versusView(game) {
+  const versus = game.versus;
+  if (!versus?.rival) return { active: false, level: null, rival: null, records: [], wins: { you: 0, rival: 0, tie: 0 } };
+
+  const level = RIVAL_LEVELS[versus.level] ?? RIVAL_LEVELS[DEFAULT_RIVAL_LEVEL];
+  const rival = versus.rival;
+  const records = versusRecords(game);
+  const wins = { you: 0, rival: 0, tie: 0 };
+  for (const record of records) wins[record.winner] += 1;
+
+  const last = records.at(-1) ?? null;
+  return {
+    active: true,
+    level: { key: level.key, name: level.name, icon: level.icon, style: level.style, desc: level.desc, bonusPoints: level.bonusPoints },
+    rival: {
+      name: rival.student.name,
+      nickname: rival.student.nickname,
+      className: rival.student.className,
+      avatarIcon: rival.student.avatarIcon,
+      status: rival.status,
+      turn: rival.turn,
+      estimateTotal: estimateExam(rival).total,
+      exam: rival.exams.at(-1) ? { name: rival.exams.at(-1).name, total: rival.exams.at(-1).total, rank: rival.exams.at(-1).rank } : null,
+      ending: rival.ending ? { title: rival.ending.title, tier: rival.ending.tier ?? null, total: rival.ending.total ?? null, rank: rival.ending.rank ?? null } : null,
+    },
+    you: {
+      estimateTotal: estimateExam(game).total,
+      exam: game.exams.at(-1) ? { name: game.exams.at(-1).name, total: game.exams.at(-1).total, rank: game.exams.at(-1).rank } : null,
+    },
+    last,
+    ahead: !last ? 'none' : last.winner,
+    diff: last ? last.diff : 0,
+    wins,
+    records,
+  };
+}
+
+/**
+ * 对战用的"等效分"。
+ *
+ * 保送 / 强基 / 出国 / 退学这类结局不参加高考，没有总分（`ending.total` 是空的）。
+ * 直接按 0 折算会让"保送"（最好的结局之一）在面板上输给随便一个 452 分，
+ * 所以按结局的 `good` 给一个等效分：好结局 700（985 线以上），坏结局 380（专科线以下），
+ * 并在总结里标 `equivalent: true`——界面上会写明这是等效判定，不是真考了这么多分。
+ */
+function versusEquivalentScore(side) {
+  if (Number.isFinite(side.total) && side.total > 0) return side.total;
+  return side.good === false ? 380 : 700;
+}
+
+/** 结局页的对战总结：两个人各自的结局 + 谁赢了。 */
+function versusSummary(game, ending) {
+  const versus = game.versus;
+  if (!versus?.rival) return null;
+  const level = RIVAL_LEVELS[versus.level] ?? RIVAL_LEVELS[DEFAULT_RIVAL_LEVEL];
+  const rival = versus.rival;
+  const records = versusRecords(game);
+  const wins = { you: 0, rival: 0, tie: 0 };
+  for (const record of records) wins[record.winner] += 1;
+
+  const you = {
+    name: game.student.name,
+    total: Number.isFinite(ending?.total) ? ending.total : null,
+    rank: ending?.rank ?? game.exams.at(-1)?.rank ?? null,
+    endingTitle: ending?.title ?? '——',
+    tier: ending?.tier ?? null,
+    good: ending?.good,
+  };
+  const them = {
+    name: rival.student.name,
+    className: rival.student.className,
+    total: Number.isFinite(rival.ending?.total) ? rival.ending.total : null,
+    rank: rival.ending?.rank ?? rival.exams.at(-1)?.rank ?? null,
+    endingTitle: rival.ending?.title ?? '——',
+    tier: rival.ending?.tier ?? null,
+    good: rival.ending?.good,
+  };
+
+  const mine = versusEquivalentScore(you);
+  const theirs = versusEquivalentScore(them);
+  return {
+    level: { key: level.key, name: level.name, icon: level.icon, style: level.style, desc: level.desc },
+    you: { ...you, score: mine, equivalent: mine !== you.total },
+    rival: { ...them, score: theirs, equivalent: theirs !== them.total },
+    winner: mine === theirs ? 'tie' : mine > theirs ? 'you' : 'rival',
+    diff: mine - theirs,
+    wins,
+    records,
+  };
+}
+
 
 export const EFF = {
   /** 边际递减：每点已有知识让后续收益打 0.55% 的折，最低保留 35%。 */
@@ -805,6 +1254,12 @@ export function createGame(options = {}) {
   const avatar = AVATAR_MAP[options.avatar] ? options.avatar : 'student';
   const preset = PRESET_MAP[options.preset] ? options.preset : null;
   const customCast = normalizeCustomCast(options.customCast);
+  /*
+   * 玩法（v3.0）：单人 / AI 对战。
+   * depth 是给对局内部再开一局用的保险——AI 那一局永远是单人，不会套娃。
+   */
+  const mode = options.mode === 'versus' && Number(options.depth ?? 0) === 0 ? 'versus' : 'solo';
+  const rivalLevel = RIVAL_LEVELS[options.rivalLevel] ? options.rivalLevel : DEFAULT_RIVAL_LEVEL;
 
   const baseMods = sumMods(
     ...traits.map((id) => TRAIT_MAP[id]?.mods),
@@ -905,6 +1360,10 @@ export function createGame(options = {}) {
     volunteerMode: options.volunteers !== false,
     /** 因果链：几周之后要长出后果的选择。 */
     chains: [],
+    /** 玩法：'solo' | 'versus'（见 MODES）。 */
+    mode,
+    /** AI 对战的对手（单人模式是 null）。 */
+    versus: null,
     pendingEvent: null,
     phase: 'main',
     status: 'playing',
@@ -1001,6 +1460,20 @@ export function createGame(options = {}) {
         (weak.length > 0
           ? `${weak.join('、')}这几科基本是班里倒数——开学第一次家长会，${people.head.teacher}把这几个字圈了出来。`
           : `每一科都在及格线上晃，没有一科能拉分。`),
+    );
+  }
+
+  if (mode === 'versus') {
+    const level = RIVAL_LEVELS[rivalLevel];
+    const rival = createRivalGame({ seedText, difficulty, custom: options.custom, weeksPerSemester, track: trackId, electives, levelKey: rivalLevel });
+    game.versus = { level: rivalLevel, rival, reported: [] };
+    pushLog(
+      game,
+      'system',
+      `⚔️ AI 对战：${level.icon} ${level.name}（${level.style}）`,
+      `隔壁班的${rival.student.name}${rival.student.className}也在这三年里。` +
+        `你们考同一张卷子、上同一张红榜——每次考完试，你会看到你们俩差了多少分。` +
+        `（${level.desc}）`,
     );
   }
   return game;
@@ -1292,8 +1765,17 @@ export function playWeek(game, strategy, options = {}) {
 }
 
 function endPhase(game, result) {
-  if (game.phase === 'main') {
+  const phase = game.phase;
+  if (phase === 'main') {
     game.phase = 'weekend';
+    /*
+     * AI 对战（v3.0）：玩家消耗了一个阶段，AI 也打一拍。
+     *
+     * 钩在 endPhase 里而不是 performAction 里，是因为"阶段真的推进了"只有一个出口——
+     * 玩家点完行动如果有待处理事件，阶段要等他选完才推进（resolveEvent 里也会走到这里），
+     * 这样 AI 的节奏和玩家天然对齐，不需要额外的计数器。
+     */
+    advanceRivalPhase(game, phase);
     return;
   }
   game.phase = 'main';
@@ -1302,6 +1784,7 @@ function endPhase(game, result) {
   if (game.status === 'playing' && checkCollapse(game, result.lines)) return;
   if (game.status !== 'playing') return;
   advanceWeek(game, result);
+  advanceRivalPhase(game, phase);
 }
 
 /* --------------------------------------------------------------- 事件 */
@@ -1766,9 +2249,29 @@ function finish(game, endingId, extra = {}) {
     at: entry.at,
   }));
 
+  /*
+   * AI 对战：先把 AI 的三年走完，再结算两个人的对比。
+   * 不这么做的话，玩家第 3 周被劝退时 AI 才打到第 3 周，"谁赢了"就没有答案。
+   */
+  if (game.versus?.rival && game.versus.rival.status !== 'ended') settleRival(game);
+  ending.versus = versusSummary(game, ending);
+
   game.status = 'ended';
   game.ending = ending;
   pushLog(game, 'system', `结局：${ending.title}`, ending.text);
+  if (ending.versus) {
+    const describe = (side) =>
+      `${side.name}：${side.endingTitle}${side.total ? `，${side.total} 分` : ''}${side.rank ? `，年级第 ${side.rank} 名` : ''}`;
+    const verdict =
+      ending.versus.winner === 'you' ? '你赢了' : ending.versus.winner === 'rival' ? `${ending.versus.rival.name}赢了` : '打平';
+    pushLog(
+      game,
+      'system',
+      `⚔️ 对战结果：${verdict}`,
+      `${describe(ending.versus.you)}\n${describe(ending.versus.rival)}\n` +
+        `考试交手 ${ending.versus.records.length} 次：你胜 ${ending.versus.wins.you}、对手胜 ${ending.versus.wins.rival}、平 ${ending.versus.wins.tie}。`,
+    );
+  }
   return game.ending;
 }
 
@@ -2260,6 +2763,8 @@ export function endingCatalog() {
 export function runSummary(game) {
   const view = viewState(game);
   const gaokao = game.exams.find((exam) => exam.kind === 'gaokao');
+  // 对战模式的摘要：把实时对比和结局对比合成一份（单人模式是 null）
+  const versus = view.versus?.active ? { ...view.versus, ending: game.ending?.versus ?? null } : null;
   return {
     name: game.student.name,
     seed: game.seedText,
@@ -2295,6 +2800,9 @@ export function runSummary(game) {
     items: game.items.slice(),
     cast: (game.cast?.list ?? []).map((person) => ({ id: person.id, name: person.name, role: person.role })),
     storyChapters: (game.story ?? []).map((entry) => `${entry.arcTitle} · ${entry.title}`),
+    /** v3.0：玩法与对战结果（单人模式是 null） */
+    mode: game.mode ?? 'solo',
+    versus,
   };
 }
 
@@ -2346,6 +2854,21 @@ export function deserialize(input) {
   data.student.nickname ??= '';
   data.difficultyRules ??= null;
   data.items ??= [];
+  /*
+   * v3.0 的玩法：老存档（v2.x）没有这两个字段，一律当单人模式。
+   * 对战存档里的 AI 那一局是完整的一局（自己序列化进去的），
+   * 这里只做两件事：把强度档修正到已知值、把对手那一局钉死成"独立单人局"
+   * （防止手改的存档写出互相引用的死循环）。
+   */
+  data.mode = data.mode === 'versus' && data.versus?.rival && typeof data.versus.rival === 'object' ? 'versus' : 'solo';
+  if (data.mode === 'versus') {
+    data.versus.level = RIVAL_LEVELS[data.versus.level] ? data.versus.level : DEFAULT_RIVAL_LEVEL;
+    data.versus.reported = Array.isArray(data.versus.reported) ? data.versus.reported : [];
+    data.versus.rival.mode = 'solo';
+    data.versus.rival.versus = null;
+  } else {
+    data.versus = null;
+  }
   data.npc = { head: 55, math: 50, deskmate: 45, friend: 35, rival: 30, parents: 60, love: 0, ...(data.npc ?? {}) };
   // 「不进则退」的周记账：老存档没有这几个字段，补成干净的初始状态
   data.weekGain = data.weekGain && typeof data.weekGain === 'object' ? data.weekGain : {};
@@ -2402,6 +2925,10 @@ export function viewState(game) {
     school: { name: SCHOOL.name, short: SCHOOL.short, motto: SCHOOL.motto, city: SCHOOL.city },
     student: { ...game.student },
     status: game.status,
+    /** 玩法：'solo' | 'versus'（v3.0）。 */
+    mode: game.mode ?? 'solo',
+    /** AI 对战的实时对比（单人模式返回 { active: false }）。 */
+    versus: versusView(game),
     difficulty: { ...rulesOf(game), key: game.difficulty },
     /** 自定义难度是不是玩家自己调过（界面显示"自定义"标记） */
     customRules: game.difficultyRules ? { ...game.difficultyRules } : null,

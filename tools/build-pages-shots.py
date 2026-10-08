@@ -136,7 +136,7 @@ def build_og():
     title = load_font(62)
     tagline = load_font(30)
     subtitle = load_font(22, bold=False)
-    draw.text((64, 178), "马鞍山二中模拟器", font=title, fill=(230, 237, 243))
+    draw.text((64, 178), "中二野人实验室", font=title, fill=(230, 237, 243))
     draw.text((66, 268), "三年 · 六个学期 · 72 次抉择", font=tagline, fill=(79, 212, 99))
     draw.text((66, 320), "37 种行动 · 95 个随机事件 · 29 个结局", font=subtitle, fill=(154, 167, 180))
     draw.text((66, 356), "免费 · 无广告 · 无内购 · 不联网也能玩", font=subtitle, fill=(154, 167, 180))

@@ -130,7 +130,7 @@ function runVerbose() {
 function runMatrix() {
   const trackName = TRACK_MAP[track]?.name ?? track;
   const goalName = goal ? GOAL_MAP[goal]?.name ?? goal : '（每局随机目标）';
-  console.log('\n马鞍山二中模拟器 · 平衡测试');
+  console.log('\n中二野人实验室 · 平衡测试');
   console.log(
     `难度 ${difficulty}　${trackName}　每学期 ${weeks} 周（一局 ${weeks * 6} 周 × 2 段）　每种策略 ${runs} 局` +
       `${endless ? '　自由模式' : ''}　目标：${goalName}\n`,

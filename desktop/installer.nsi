@@ -1,4 +1,4 @@
-; 马鞍山二中模拟器 · Windows 安装包脚本（NSIS 3 / Unicode）
+; 中二野人实验室 · Windows 安装包脚本（NSIS 3 / Unicode）
 ;
 ; 这是一个模板：@@...@@ 占位符由 tools/build-installer.mjs 替换后生成临时 .nsi 再编译。
 ; 之所以生成临时文件而不是用 /D 传参，是因为项目路径里有中文和空格，

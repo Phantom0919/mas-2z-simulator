@@ -1,6 +1,6 @@
 {
-  "name": "马鞍山二中模拟器",
-  "short_name": "马鞍山二中",
+  "name": "中二野人实验室",
+  "short_name": "中二野人实验室",
   "description": "一个零依赖的 Node.js 高中生活模拟器：3+1+2 选科、天赋构筑、每周两段决策、23 个结局。",
   "lang": "zh-CN",
   "start_url": "./index.html",

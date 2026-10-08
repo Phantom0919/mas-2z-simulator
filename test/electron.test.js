@@ -35,7 +35,7 @@ test('内嵌服务监听随机端口并能响应接口', async () => {
     assert.equal(health.ok, true);
 
     const page = await fetch(`${embedded.url}/`).then((response) => response.text());
-    assert.match(page, /马鞍山二中模拟器/);
+    assert.match(page, /中二野人实验室/);
 
     const options = await fetch(`${embedded.url}/api/options`).then((response) => response.json());
     assert.equal(options.traits.length, TRAITS.length);
@@ -263,7 +263,7 @@ test('桌面版自检脚本能在真实服务上全部通过（不需要 Electro
     const storage = new Map();
     const fakeWindow = { mas2z: { isDesktop: true, platform: 'test' } };
     const fakeDocument = {
-      title: '马鞍山二中模拟器',
+      title: '中二野人实验室',
       getElementById: (id) => (ids.has(id) ? { id } : null),
     };
     const fakeLocalStorage = {
@@ -341,18 +341,26 @@ function zipEntryNamesPartial(file) {
   }
 }
 
-test('便携版压缩包结构正确（存在 dist/desktop/*.zip 时才检查）', (t) => {
+test('便携版压缩包结构正确（存在当前版本的 dist/desktop/*.zip 时才检查）', (t) => {
   const dir = join(root, 'dist', 'desktop');
-  const zip = existsSync(dir) ? readdirSync(dir).find((name) => name.endsWith('.zip')) : null;
+  const version = JSON.parse(read('package.json')).version;
+  /*
+   * 只认当前版本那一份。dist/desktop 里可能还躺着好几个以前版本的产物
+   * （改过名字之后，老产物里的 exe 名当然和现在不一样），
+   * 拿它们来断言"改名生效了"是测错了对象。
+   */
+  const zip = existsSync(dir)
+    ? readdirSync(dir).find((name) => name.endsWith('.zip') && name.includes(`-${version}-`))
+    : null;
   if (!zip) {
-    t.skip('还没有打便携版（node tools/build-desktop.mjs）');
+    t.skip(`还没有打这一版（${version}）的便携版（node tools/build-desktop.mjs）`);
     return;
   }
 
   const names = zipEntryNamesPartial(join(dir, zip));
   const exes = names.filter((name) => name.endsWith('.exe'));
   assert.equal(exes.length, 1, `应该只有一个 exe，实际 ${exes.length} 个：${exes.join(', ')}`);
-  assert.ok(exes[0].includes('马鞍山二中模拟器'), 'exe 应该已经改名');
+  assert.ok(exes[0].includes('中二野人实验室'), 'exe 应该已经改名');
   assert.ok(!names.some((name) => name.endsWith('electron.exe')), '改名后不应该再留 electron.exe');
 
   for (const required of [

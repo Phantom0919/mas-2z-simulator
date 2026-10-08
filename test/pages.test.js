@@ -88,7 +88,7 @@ test('关于我们：讲清项目性质，并挂上赞助商', () => {
 test('首屏有搜索与分享需要的标签（吸引用户点的门面）', () => {
   const html = readDocs('index.html');
   assert.match(html, /<html lang="zh-CN">/);
-  assert.match(html, /<title>马鞍山二中模拟器 · 官方网站<\/title>/);
+  assert.match(html, /<title>中二野人实验室 · 官方网站<\/title>/);
   assert.match(html, /name="description"\s+content="[^"]{40,}"/);
   assert.match(html, /property="og:title"/);
   assert.match(html, /property="og:description"/);
@@ -129,7 +129,7 @@ test('发布页上的 APK 与 dist 产物字节一致（存在 dist 产物时才
   assert.equal(packed.length, info.bytes, 'latest.json 的体积和真实文件对不上');
   assert.equal(sha256(packed), info.sha256, 'latest.json 的 sha256 和真实文件对不上');
 
-  const dist = join(root, 'dist', `马鞍山二中模拟器-${pkg.version}-debug.apk`);
+  const dist = join(root, 'dist', `中二野人实验室-${pkg.version}-debug.apk`);
   if (!existsSync(dist)) {
     t.skip('dist 里还没有这一版的 APK，跳过与产物的比对');
     return;

@@ -23,7 +23,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
-    <title>马鞍山二中模拟器</title>
+    <title>中二野人实验室</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
@@ -48,7 +48,7 @@
           <path class="splash-spark" d="M66 4 l3.6 7.3 -3.6 7.3 -3.6 -7.3 z" />
           <text class="splash-gl" x="66" y="83">贰中</text>
         </svg>
-        <h2 class="splash-title">马鞍山二中模拟器</h2>
+        <h2 class="splash-title">中二野人实验室</h2>
         <p class="splash-subtitle">厚德 · 励学 · 敦行</p>
         <p class="splash-tagline">三年 · 六个学期 · 七十二次选择</p>
       </div>
@@ -59,7 +59,7 @@
       <div class="brand">
         <span class="brand-logo">🏫</span>
         <div>
-          <h1>马鞍山二中模拟器</h1>
+          <h1>中二野人实验室</h1>
           <p id="motto">厚德 · 励学 · 敦行</p>
         </div>
       </div>
@@ -98,6 +98,8 @@
       <section class="panel panel-status">
         <h2>我的状态</h2>
         <div id="stats"></div>
+        <h2 id="versus-title" hidden>⚔️ 对战</h2>
+        <div id="versus-body" hidden></div>
         <h2>科目掌握</h2>
         <div id="subjects"></div>
         <h2>开局构筑</h2>
@@ -149,7 +151,20 @@
         <div class="pick-grid preset-grid" id="preset-options"></div>
 
         <details class="creator-block" open>
-          <summary>① 这个人是谁</summary>
+          <summary>① 玩法（单人 / AI 对战）</summary>
+          <p class="creator-note muted small">
+            单人模式就是你自己玩；AI 对战会给你安排一个隔壁班的同学，用<strong>同一套规则</strong>打满三年——
+            同样的知识曲线、同样的疲劳与心情，每次考试和你上同一张红榜，结局时并排比一次。
+          </p>
+          <div class="pick-grid" id="mode-options"></div>
+          <div id="rival-levels" hidden>
+            <h3 class="build-title">AI 强度（它有多拼）</h3>
+            <div class="pick-grid" id="rival-options"></div>
+          </div>
+        </details>
+
+        <details class="creator-block" open>
+          <summary>② 这个人是谁</summary>
           <div class="form-grid">
             <label>姓名 <span class="name-row"><input id="input-name" maxlength="12" placeholder="留空则随机" /><button type="button" id="btn-random-name" class="ghost" title="随机一个中文常见名字">🎲</button></span></label>
             <label>性别 <select id="input-gender"><option value="男">男</option><option value="女">女</option></select></label>
@@ -160,7 +175,7 @@
         </details>
 
         <details class="creator-block" open>
-          <summary>② 性格（选 1）与天赋（选 2）</summary>
+          <summary>③ 性格（选 1）与天赋（选 2）</summary>
           <p class="creator-note muted small">性格决定"这个人是什么脾气"，可以带负面；天赋是能力。</p>
           <div class="pick-grid" id="personality-options"></div>
           <h3 class="build-title">天赋（十一选二）<span class="muted small" id="trait-count"></span></h3>
@@ -168,13 +183,13 @@
         </details>
 
         <details class="creator-block">
-          <summary>③ 缺陷（可选 0~1 个，用短板换属性点）</summary>
+          <summary>④ 缺陷（可选 0~1 个，用短板换属性点）</summary>
           <p class="creator-note muted small">认下一个短板，就能多拿 4~6 点属性点。想要高上限，先接受低起点。</p>
           <div class="pick-grid" id="flaw-options"></div>
         </details>
 
         <details class="creator-block" open>
-          <summary>④ 属性点</summary>
+          <summary>⑤ 属性点</summary>
           <p class="creator-note muted small" id="point-budget"></p>
           <div class="point-bar"><i id="point-fill" class="point-fill"></i></div>
           <div id="point-attrs"></div>
@@ -183,7 +198,7 @@
         </details>
 
         <details class="creator-block" open>
-          <summary>⑤ 选科与目标</summary>
+          <summary>⑥ 选科与目标</summary>
           <h3 class="build-title">首选科目（二选一）</h3>
           <div class="pick-grid" id="track-options"></div>
           <h3 class="build-title">再选科目（四选二）</h3>
@@ -195,13 +210,13 @@
         </details>
 
         <details class="creator-block">
-          <summary>⑥ 自定义关系人物（可不填）</summary>
+          <summary>⑦ 自定义关系人物（可不填）</summary>
           <p class="creator-note muted small">同桌、死党、老对手、心动对象——名字和性别都可以自己定，不填就随机。</p>
           <div id="cast-roles"></div>
         </details>
 
         <details class="creator-block" open>
-          <summary>⑦ 难度与节奏</summary>
+          <summary>⑧ 难度与节奏</summary>
           <div class="form-grid">
             <label>难度 <select id="input-difficulty"></select><span id="difficulty-hint" class="muted small difficulty-hint"></span></label>
             <label>每学期周数 <input id="input-weeks" type="number" min="3" max="20" value="6" /></label>
@@ -445,7 +460,7 @@
         <div class="community-block">
           <h3 class="build-title">关于我们</h3>
           <p class="muted">
-            马鞍山二中模拟器是一个<strong>个人独立项目</strong>：引擎、文案、界面都是自己写的，
+            中二野人实验室是一个<strong>个人独立项目</strong>：引擎、文案、界面都是自己写的，
             用 Node.js + 原生 HTML/CSS/JS 做成——没有前端框架、没有后端服务、没有账号、没有广告和内购，
             也不收集任何数据。当前版本 <b id="community-version">v2.9.0</b>。
           </p>

@@ -366,6 +366,11 @@ export function createLocalApi() {
           preset: body.preset,
           customCast: body.customCast,
           endless: body.endless,
+          // v3.0 玩法：单人 / AI 对战（离线模式必须和服务端一样支持，否则手机上少了半个功能）
+          mode: body.mode,
+          rivalLevel: body.rivalLevel,
+          // 高考之后要不要走志愿填报（CLI 早就有了，网页/APK 这一版才接上）
+          volunteers: body.volunteers,
         });
         return { gameId: 'local', lines: [], view: viewState(game) };
       }

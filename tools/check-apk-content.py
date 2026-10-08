@@ -86,6 +86,19 @@ CHECKS = [
     ("assets/www/app.js", "openCommunityModal", None),
     ("assets/www/app.js", "execCommand('copy')", None),
     ("assets/www/style.css", ".community-block", None),
+    # v3.0：改名 + AI 对战必须一起进包（校名只写"二中"，产品名是新名字）
+    ("assets/www/index.html", "中二野人实验室", None),
+    ("assets/www/manifest.webmanifest", "中二野人实验室", None),
+    ("assets/src/data/school.js", "name: '二中'", "马鞍山市第二中学"),
+    ("assets/src/engine.js", "RIVAL_LEVELS", None),
+    ("assets/src/engine.js", "advanceRivalPhase", None),
+    ("assets/src/engine.js", "versusView", None),
+    ("assets/src/engine.js", "settleRival", None),
+    ("assets/www/index.html", 'id="mode-options"', None),
+    ("assets/www/index.html", 'id="versus-body"', None),
+    ("assets/www/app.js", "renderModes", None),
+    ("assets/www/app.js", "versusEndingHtml", None),
+    ("assets/www/local-api.js", "rivalLevel", None),
 ]
 
 

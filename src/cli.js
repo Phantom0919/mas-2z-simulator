@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 马鞍山二中模拟器 · 终端界面 v2
+ * 中二野人实验室 · 终端界面 v2
  *
  *   node src/cli.js                                 开局向导 + 交互游玩
  *   node src/cli.js --track history --electives politics,geography
@@ -153,6 +153,21 @@ function renderStatus(game) {
       view.nextExam ? `下一场：${view.nextExam.name}（${view.nextExam.inWeeks === 0 ? '本周' : `${view.nextExam.inWeeks} 周后`}）` : '无'
     }`,
   );
+  // v3.0 对战模式：状态框里随时能看到"你和隔壁那位差多少"
+  if (view.versus?.active) {
+    const current = view.versus;
+    const tail = !current.last
+      ? '还没交手'
+      : current.last.winner === 'tie'
+        ? '上次打平'
+        : current.last.winner === 'you'
+          ? `上次领先 ${current.last.diff} 分`
+          : `上次落后 ${Math.abs(current.last.diff)} 分`;
+    lines.push(
+      `│ ⚔️ ${dim(`${current.level.icon}${current.level.name} AI`)} ${current.rival.name}　预估 ${bold(magenta(String(current.rival.estimateTotal)))}` +
+        `　${tail}　交手 ${current.records.length} 场（你胜 ${current.wins.you}／对手胜 ${current.wins.rival}）`,
+    );
+  }
   const statCells = [];
   for (const [key, meta] of Object.entries(STAT_META)) {
     const value = view.stats[key];
@@ -270,6 +285,18 @@ function renderEnding(game) {
     console.log(`  各科：${view.subjects.map((s) => `${s.name} ${ending.subjects?.[s.key] ?? '-'}`).join('　')}`);
   } else {
     console.log(`  去向：${bold(green(ending.school ?? '—'))}（${ending.tier ?? '—'}）`);
+  }
+  // v3.0：AI 对战的总结——赢没赢、两个人在同一张榜上各考了多少
+  if (ending.versus) {
+    const versus = ending.versus;
+    const verdict =
+      versus.winner === 'you' ? bold(green('你赢了')) : versus.winner === 'rival' ? bold(red(`${versus.rival.name} 赢了`)) : yellow('打平');
+    const side = (item) =>
+      `${item.total ? `${item.total} 分` : '未参加高考'}${item.rank ? `，年级第 ${item.rank} 名` : ''}${item.equivalent ? '（按结局档次等效判定）' : ''}`;
+    console.log(divider(`⚔️ AI 对战（${versus.level.icon} ${versus.level.name} · ${versus.level.style}）`));
+    console.log(`  ${verdict}　考试交手 ${versus.records.length} 次：你胜 ${versus.wins.you}／对手胜 ${versus.wins.rival}／平 ${versus.wins.tie}`);
+    console.log(`  你　　${bold(versus.you.endingTitle)}　${side(versus.you)}`);
+    console.log(`  ${versus.rival.name}　${bold(versus.rival.endingTitle)}　${side(versus.rival)}`);
   }
   console.log('');
   console.log(`  ${ending.text ?? ''}`);
@@ -852,6 +879,8 @@ ${SCHOOL.name} 模拟器 · 终端版 v2
   --difficulty <难度>     easy | normal | hard | realistic | custom
   --weeks <周数>          每学期周数，3-20（默认 ${DEFAULT_WEEKS_PER_SEMESTER}）
   --endless               自由模式：什么时候高考由你决定
+  --mode <solo|versus>    玩法：单人 / AI 对战（默认 solo）
+  --rival <easy|normal|hard|real>  AI 对战时对手的强度（默认 normal）
   --no-volunteers         跳过高考后的志愿填报（直接按分数录取，做对照用）
   --volunteers <编号>     自动对局时指定的志愿，例如 "3 7 2"（编号见对局中打印的志愿表）
   --no-adjust             填志愿时不服从调剂（滑档就真的没书读）
@@ -1047,6 +1076,9 @@ async function main() {
     endless: Boolean(argv.endless),
     // 高考之后要不要填志愿（v2.6 的新终局玩法）；--no-volunteers 可以关掉
     volunteers: !argv.noVolunteers,
+    // v3.0 玩法：单人 / AI 对战（--mode versus --rival hard）
+    mode: argv.mode === 'versus' ? 'versus' : 'solo',
+    rivalLevel: argv.rival ? String(argv.rival) : undefined,
   };
 
   let game;
@@ -1165,6 +1197,17 @@ function summaryOf(game) {
     knowledge: Object.fromEntries(view.subjects.map((subject) => [subject.key, subject.knowledge])),
     achievements: game.ending?.achievements?.map((item) => item.name) ?? [],
     items: view.items.map((item) => item.name),
+    // v3.0：玩法与对战结果（单人模式 versus 是 null）
+    mode: view.mode,
+    versus: view.versus?.active
+      ? {
+          level: view.versus.level,
+          rival: view.versus.rival,
+          wins: view.versus.wins,
+          records: view.versus.records.map((record) => ({ name: record.name, you: record.you, ai: record.ai, winner: record.winner })),
+          ending: game.ending?.versus ?? null,
+        }
+      : null,
   };
 }
 

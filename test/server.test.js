@@ -59,7 +59,7 @@ test('首页与静态资源可访问', async () => {
     const html = await fetch(`${base}/`);
     assert.equal(html.status, 200);
     assert.match(html.headers.get('content-type'), /text\/html/);
-    assert.match(await html.text(), /马鞍山二中模拟器/);
+    assert.match(await html.text(), /中二野人实验室/);
 
     const css = await fetch(`${base}/style.css`);
     assert.equal(css.status, 200);

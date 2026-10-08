@@ -1,4 +1,4 @@
-/* 马鞍山二中模拟器 · 网页版样式（深色校园风，无框架） */
+/* 中二野人实验室 · 网页版样式（深色校园风，无框架） */
 
 :root {
   --bg: #0d1117;
@@ -2880,6 +2880,126 @@ button,
   .volunteer-slot-actions button {
     min-width: 40px;
     min-height: 40px;
+  }
+}
+
+/* ---------- ⚔️ AI 对战（v3.0） ---------- */
+
+/* 左栏那块"你 vs 对手"：两行、一眼看得出谁在前 */
+.versus-level {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: var(--brand-2);
+  letter-spacing: 0.5px;
+}
+
+.versus-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(15, 21, 29, 0.55);
+  font-size: 13px;
+}
+
+.versus-row + .versus-row {
+  margin-top: 6px;
+}
+
+.versus-row.ok {
+  border-color: rgba(63, 185, 80, 0.45);
+}
+
+.versus-row.miss {
+  border-color: rgba(248, 81, 73, 0.4);
+}
+
+.versus-who {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.versus-score {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.versus-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* 结局页的对战卡片：赢了给绿边，输了给红边，别做得像弹窗 */
+.versus-card {
+  margin: 16px 0 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(15, 21, 29, 0.6);
+}
+
+.versus-card.win {
+  border-color: rgba(63, 185, 80, 0.5);
+  background: linear-gradient(180deg, rgba(63, 185, 80, 0.1), rgba(15, 21, 29, 0.6));
+}
+
+.versus-card.lose {
+  border-color: rgba(248, 81, 73, 0.45);
+  background: linear-gradient(180deg, rgba(248, 81, 73, 0.09), rgba(15, 21, 29, 0.6));
+}
+
+.versus-head {
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+
+.versus-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13.5px;
+}
+
+.versus-line span {
+  min-width: 4.5em;
+  color: var(--muted);
+}
+
+.versus-line b {
+  color: var(--text);
+}
+
+.versus-line i {
+  font-style: normal;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.versus-foot {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+@media (max-width: 860px) {
+  /* 手机上对战面板和状态挤在一起，字号再小一档 */
+  .versus-row {
+    font-size: 12.5px;
+    padding: 6px 9px;
   }
 }
 

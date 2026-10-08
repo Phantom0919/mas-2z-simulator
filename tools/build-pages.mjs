@@ -49,7 +49,7 @@ const REQUIRED_MODULES = [
 const FORBIDDEN_MODULES = ['src/server.js', 'src/cli.js', 'src/profile.js', 'src/prompt.js', 'src/strategies.js'];
 
 /** APK 在发布页上的固定文件名（不带版本号：页面上的版本号由 latest.json 提供）。 */
-const APK_NAME = '马鞍山二中模拟器-安卓版.apk';
+const APK_NAME = '中二野人实验室-安卓版.apk';
 const APK_LINK = `./download/${APK_NAME}`;
 
 const log = (...args) => console.log('[pages]', ...args);
@@ -66,7 +66,7 @@ function readPackage() {
 }
 
 function findApk(version) {
-  const expected = path.join(DIST, `马鞍山二中模拟器-${version}-debug.apk`);
+  const expected = path.join(DIST, `中二野人实验室-${version}-debug.apk`);
   if (existsSync(expected)) return expected;
   const candidates = existsSync(DIST)
     ? readdirSync(DIST)
@@ -115,6 +115,9 @@ function buildDownload(version) {
   const bytes = readFileSync(apk);
   const sha256 = createHash('sha256').update(bytes).digest('hex');
 
+  // 先清干净：改过名字（v3.0 起叫中二野人实验室）之后，
+  // 旧文件名的 APK 留在这里就会被一起发到 Pages 上，白占体积还容易点错
+  rmSync(path.join(DOCS, 'download'), { recursive: true, force: true });
   mkdirSync(path.join(DOCS, 'download'), { recursive: true });
   const target = path.join(DOCS, 'download', APK_NAME);
   writeFileSync(target, bytes);
@@ -263,7 +266,7 @@ function listFiles(dir, base = dir) {
 
 function packZip(version) {
   const entries = listFiles(DOCS).map(({ name, full }) => ({ name, data: readFileSync(full) }));
-  const target = path.join(DIST, `马鞍山二中模拟器-${version}-发布页.zip`);
+  const target = path.join(DIST, `中二野人实验室-${version}-发布页.zip`);
   mkdirSync(DIST, { recursive: true });
   writeZip(entries, target);
   const size = statSync(target).size;

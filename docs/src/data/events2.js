@@ -249,7 +249,7 @@ export const EXTRA_EVENTS = [
     weight: 6,
     minTurn: 8,
     cond: (game) => game.semesterIndex >= 4,
-    text: '表姐从合肥读研回来，说可以每周视频给你讲一个小时题。她手边还放着当年自己的高考笔记，封面写着"马鞍山二中 2018"。',
+    text: '表姐从合肥读研回来，说可以每周视频给你讲一个小时题。她手边还放着当年自己的高考笔记，封面写着"二中 2018"。',
     choices: [
       {
         id: 'weekly',

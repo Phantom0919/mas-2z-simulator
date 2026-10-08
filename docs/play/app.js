@@ -1,5 +1,5 @@
 /**
- * 马鞍山二中模拟器 · 网页前端 v2
+ * 中二野人实验室 · 网页前端 v2
  *
  * 原生 ES 模块，无构建步骤、无依赖。流程：
  *   开局构筑（选科 / 天赋 / 背景 / 目标）→ 每周两段（主行动 + 周末）
@@ -221,7 +221,7 @@ function syncCommunityLinks() {
 /** 推荐文案（不是给玩家看的，是给他粘到群里 / 频道里的）。 */
 function communityShareText() {
   return [
-    `我在玩《马鞍山二中模拟器》v${GAME_VERSION}：三年、六个学期、72 次抉择，`,
+    `我在玩《中二野人实验室》v${GAME_VERSION}：三年、六个学期、72 次抉择，`,
     '37 种行动、95 个随机事件、29 个结局，高考之后还要自己填六个志愿。',
     `腾讯频道【模拟器发布页】：${COMMUNITY_URL}`,
   ].join('');
@@ -236,7 +236,7 @@ function endingShareText() {
   if (ending.rank) bits.push(`年级第 ${ending.rank} 名`);
   if (ending.achievements?.length) bits.push(`${ending.achievements.length} 个成就`);
   return [
-    `我在《马鞍山二中模拟器》v${GAME_VERSION} 里打出了「${ending.title}」`,
+    `我在《中二野人实验室》v${GAME_VERSION} 里打出了「${ending.title}」`,
     bits.length > 0 ? `（${bits.join('，')}）` : '',
     `。腾讯频道【模拟器发布页】：${COMMUNITY_URL}`,
   ].join('');
@@ -578,6 +578,7 @@ function renderPanels(view) {
 
 function render(view) {
   renderPanels(view);
+  renderVersus(view);
   if (view.pendingEvent) openEventModal(view.pendingEvent);
   if (view.status === 'ended' && view.ending) {
     recordRun(view);
@@ -586,6 +587,76 @@ function render(view) {
     // 高考出分之后、录取之前：先填志愿，填完才进结局
     openVolunteerModal();
   }
+}
+
+/**
+ * ⚔️ 对战面板（只有 AI 对战模式才显示）。
+ *
+ * 只显示"能立刻做判断"的三个数：两边最近一次考试的分数与名次、交手记录。
+ * 别把 AI 的属性摊开——那是另一个人的隐私，也是玩家不需要操心的细节。
+ */
+function renderVersus(view) {
+  const title = $('versus-title');
+  const node = $('versus-body');
+  if (!title || !node) return;
+  const versus = view?.versus;
+  if (!versus?.active) {
+    title.hidden = true;
+    node.hidden = true;
+    node.innerHTML = '';
+    return;
+  }
+
+  title.hidden = false;
+  node.hidden = false;
+  const level = versus.level ?? {};
+  const me = versus.you?.exam;
+  const rival = versus.rival ?? {};
+  const ai = rival.exam;
+  const ahead = versus.ahead;
+  const note = !versus.last
+    ? '还没考过试，先各自过日子。'
+    : versus.last.winner === 'tie'
+      ? '上一次考试打平。'
+      : versus.last.winner === 'you'
+        ? `上一次考试你领先 ${Math.abs(versus.last.diff)} 分。`
+        : `上一次考试你落后 ${Math.abs(versus.last.diff)} 分。`;
+
+  node.innerHTML = `
+    <p class="versus-level">${level.icon ?? '⚔️'} ${escapeHtml(level.name ?? '')} AI · ${escapeHtml(level.style ?? '')}</p>
+    <div class="versus-row ${ahead === 'you' ? 'ok' : ''}">
+      <span class="versus-who">你</span>
+      <span class="versus-score">${me ? `${me.total} 分 · 年级第 ${me.rank}` : `预估 ${versus.you?.estimateTotal ?? view.estimateTotal} 分`}</span>
+    </div>
+    <div class="versus-row ${ahead === 'rival' ? 'miss' : ''}">
+      <span class="versus-who">${escapeHtml(rival.avatarIcon ?? '🧑')} ${escapeHtml(rival.name ?? '对手')}</span>
+      <span class="versus-score">${ai ? `${ai.total} 分 · 年级第 ${ai.rank}` : `预估 ${rival.estimateTotal ?? 0} 分`}</span>
+    </div>
+    <p class="versus-note">${escapeHtml(note)}${
+      versus.records.length
+        ? `　交手 ${versus.records.length} 次：你胜 ${versus.wins.you} · 对手胜 ${versus.wins.rival}${versus.wins.tie ? ` · 平 ${versus.wins.tie}` : ''}`
+        : ''
+    }</p>`;
+}
+
+/** 结局页里那一方的分数怎么念（没有高考分的是特殊路线，标一下等效判定）。 */
+function versusScoreText(side) {
+  const score = side.total ? `${side.total} 分` : '未参加高考';
+  const rank = side.rank ? ` · 年级第 ${side.rank} 名` : '';
+  return `${score}${rank}${side.equivalent ? '（按结局档次等效判定）' : ''}`;
+}
+
+function versusEndingHtml(versus) {
+  if (!versus) return '';
+  const verdict =
+    versus.winner === 'you' ? '你赢了' : versus.winner === 'rival' ? `${versus.rival.name} 赢了` : '打平';
+  return `
+    <div class="versus-card ${versus.winner === 'you' ? 'win' : versus.winner === 'rival' ? 'lose' : ''}">
+      <div class="versus-head">⚔️ ${escapeHtml(versus.level.icon ?? '')} ${escapeHtml(versus.level.name)} AI 对战 · <b>${escapeHtml(verdict)}</b></div>
+      <div class="versus-line"><span>你</span><b>${escapeHtml(versus.you.endingTitle)}</b><i>${escapeHtml(versusScoreText(versus.you))}</i></div>
+      <div class="versus-line"><span>${escapeHtml(versus.rival.name)}</span><b>${escapeHtml(versus.rival.endingTitle)}</b><i>${escapeHtml(versusScoreText(versus.rival))}</i></div>
+      <div class="versus-foot">考试交手 ${versus.records.length} 次：你胜 ${versus.wins.you} · 对手胜 ${versus.wins.rival} · 平 ${versus.wins.tie}　·　${escapeHtml(versus.level.desc ?? '')}</div>
+    </div>`;
 }
 
 /* ------------------------------------------------------------ 开局构筑 */
@@ -660,6 +731,9 @@ function defaultDraft() {
     seed: '',
     endless: false,
     preset: null,
+    /** v3.0：'solo' | 'versus'（玩法）与 AI 强度档 */
+    mode: 'solo',
+    rivalLevel: 'normal',
   };
 }
 
@@ -735,6 +809,32 @@ function renderPersonalities() {
 function renderFlaws() {
   renderPickGrid($('flaw-options'), listOf('flaws'), state.draft.flaws, true, (key) => {
     toggleMulti(state.draft.flaws, key, flawLimit());
+    renderBuildForm();
+  });
+}
+
+/**
+ * v3.0 玩法：单人 / AI 对战。
+ *
+ * 选 AI 对战才会把"AI 强度"放出来——两个选择放在同一个区块里，
+ * 顺序就是玩家的思考顺序：先决定跟谁玩，再决定对手多强。
+ */
+function renderModes() {
+  renderPickGrid($('mode-options'), listOf('modes'), [state.draft.mode], false, (key) => {
+    state.draft.mode = key;
+    renderBuildForm();
+  });
+  renderRivalLevels();
+}
+
+function renderRivalLevels() {
+  const box = $('rival-levels');
+  if (!box) return;
+  const versus = state.draft.mode === 'versus';
+  box.hidden = !versus;
+  if (!versus) return;
+  renderPickGrid($('rival-options'), listOf('rivalLevels'), [state.draft.rivalLevel], false, (key) => {
+    state.draft.rivalLevel = key;
     renderBuildForm();
   });
 }
@@ -966,6 +1066,7 @@ function renderBuildForm() {
   if (!state.options) return;
   syncDraftFromForm();
   renderPresets();
+  renderModes();
   renderAvatars();
   renderPersonalities();
   renderFlaws();
@@ -1018,9 +1119,13 @@ function updateBuildHint() {
   const hint = $('build-hint');
   hint.className = `build-hint${problems.length ? '' : ' ready'}`;
   const who = `${draft.name || '（随机姓名）'}${draft.nickname ? `「${draft.nickname}」` : ''}`;
+  const modeText =
+    draft.mode === 'versus'
+      ? `⚔️ AI 对战（${listOf('rivalLevels').find((item) => item.key === draft.rivalLevel)?.name ?? '普通'}）`
+      : '🎮 单人模式';
   hint.textContent = problems.length
     ? `⚠️ ${problems.join('；')}`
-    : `✅ ${who} 构筑完成，可以开始三年了。属性点已用 ${spent}/${info.total}。`;
+    : `✅ ${who} 构筑完成，可以开始三年了。${modeText}　属性点已用 ${spent}/${info.total}。`;
   $('btn-start').disabled = problems.length > 0;
 }
 
@@ -1246,6 +1351,11 @@ async function startNew() {
     preset: draft.preset ?? undefined,
     customCast,
     endless: $('input-endless').checked,
+    // v3.0 玩法：单人 / AI 对战（AI 强度只在对战时带过去）
+    mode: draft.mode ?? 'solo',
+    rivalLevel: draft.mode === 'versus' ? draft.rivalLevel : undefined,
+    // 只有分享链接会关掉志愿填报（?volunteers=0），正常开局一律走完整流程
+    volunteers: draft.volunteers === false ? false : undefined,
   };
   await guard($('start-screen'), async () => {
     const data = await api('/api/new', { method: 'POST', body: payload });
@@ -2281,6 +2391,7 @@ function renderEnding(ending) {
       ending.school ? ` · ${escapeHtml(ending.school)}` : ''
     }${ending.total ? `　高考 ${ending.total} / 750　年级第 ${ending.rank} 名` : ''}</div>
     ${admissionHtml}
+    ${versusEndingHtml(ending.versus)}
     ${goalHtml}
     <p class="ending-text">${escapeHtml(ending.text ?? '')}</p>
     ${subjects}
@@ -2361,7 +2472,7 @@ async function exportSave() {
   }
   try {
     const data = await api(`/api/export?gameId=${encodeURIComponent(state.gameId)}`);
-    const suggestedName = `马鞍山二中-${state.view?.student.name ?? '存档'}.json`;
+    const suggestedName = `中二野人实验室-${state.view?.student.name ?? '存档'}.json`;
 
     // 桌面版：走原生"另存为"对话框
     if (window.mas2z?.saveFile) {
@@ -2595,6 +2706,7 @@ function bind() {
  *   index.html?demo        直接开局（名字随机）
  *   index.html?demo=6      开局后再自动走 6 步，让日志里有东西
  *   index.html?demo&preset=olympiad&nickname=闪电&points=intelligence:6,math:2
+ *   index.html?demo=60&mode=versus&rival=hard&weeks=3   AI 对战 + 短学期（分享用）
  *
  * 后几个参数是给"分享链接"和版面探针用的：能在不开表单的情况下
  * 直接展示自定义人物的效果（外号、性格、属性点都会出现在侧栏里）。
@@ -2631,6 +2743,19 @@ async function maybeAutoStart() {
     draft.difficulty = params.get('difficulty');
     $('input-difficulty').value = draft.difficulty;
   }
+  // v3.0：分享链接也能直接指定玩法，例如 ?demo=3&mode=versus&rival=hard
+  if (params.get('mode') === 'versus') draft.mode = 'versus';
+  if (params.get('rival') && listOf('rivalLevels').some((item) => item.key === params.get('rival'))) {
+    draft.rivalLevel = params.get('rival');
+  }
+  // 学期周数：分享一个"短一点的局"用，例如 ?demo=60&weeks=3
+  if (params.get('weeks')) {
+    const weeks = Math.max(3, Math.min(20, Number(params.get('weeks')) || 6));
+    draft.weeksPerSemester = weeks;
+    $('input-weeks').value = String(weeks);
+  }
+  // 跳过志愿填报直接按分数录取：分享"一键看到结局"的链接用（?demo=60&weeks=3&volunteers=0）
+  if (params.get('volunteers') === '0') draft.volunteers = false;
   // 上面改的是草稿，startNew 会从表单读一遍，所以要先把草稿写回表单
   applyDraftToForm();
 

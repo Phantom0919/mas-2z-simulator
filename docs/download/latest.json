@@ -1,10 +1,10 @@
 {
   "format": 1,
-  "version": "2.9.0",
-  "file": "马鞍山二中模拟器-安卓版.apk",
-  "url": "./download/马鞍山二中模拟器-安卓版.apk",
-  "bytes": 490685,
-  "sha256": "ca4e3c5fb773decc956644ebd281eded7e6dcbc41708d7f6abcab3ff9fd0f91b",
-  "builtAt": "2026-10-07T11:13:37.444Z",
+  "version": "3.0.0",
+  "file": "中二野人实验室-安卓版.apk",
+  "url": "./download/中二野人实验室-安卓版.apk",
+  "bytes": 498878,
+  "sha256": "2b6f7800bc8cbce1fac0173e1247b5cbe274dbb747a3652523b91530e36aebb6",
+  "builtAt": "2026-10-08T05:28:48.528Z",
   "note": "debug 签名，安装时系统会提示「未知来源应用」，功能不受影响。"
 }

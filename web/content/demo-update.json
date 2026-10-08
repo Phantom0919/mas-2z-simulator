@@ -3,7 +3,7 @@
   "meta": {
     "name": "官方焕新内容包",
     "version": "2.6.2",
-    "author": "马鞍山二中模拟器",
+    "author": "中二野人实验室",
     "note": "演示 --diff：在 official-pack 基础上加一个事件（校园广播站）、改一条已有事件、调一次平衡"
   },
   "requires": {

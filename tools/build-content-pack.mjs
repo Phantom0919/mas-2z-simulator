@@ -20,7 +20,7 @@
  *   --out <路径>     写出文件（不给就打到 stdout）
  *   --name <名字>    包名（默认"内置内容快照"）
  *   --version <版本> 包版本（默认取引擎 GAME_VERSION，退到 package.json）
- *   --author <作者>  作者（默认"马鞍山二中模拟器"）
+ *   --author <作者>  作者（默认"中二野人实验室"）
  *   --note <说明>    备注（会自动带上前缀 "build-content-pack.mjs 生成："）
  *   --requires <约束> 兼容约束（默认 ">=<游戏版本>"）
  *   --only <段落>    只带这些段落：events,items,traits,personalities,flaws,actions,balance
@@ -236,7 +236,7 @@ function buildPack(source, args) {
     meta: {
       name: args.name ?? '内置内容快照',
       version,
-      author: args.author ?? '马鞍山二中模拟器',
+      author: args.author ?? '中二野人实验室',
       // 前缀放在最前面：note 超长会被截断，标记必须先活下来
       note: `${GENERATOR} 生成：${args.note ?? '从 src/data/* 取内置内容（含函数逻辑的条目已跳过）'}`,
     },

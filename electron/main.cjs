@@ -1,5 +1,5 @@
 /**
- * 马鞍山二中模拟器 · Electron 桌面客户端
+ * 中二野人实验室 · Electron 桌面客户端
  *
  *   npm run desktop            正常启动
  *   npm run desktop -- --dev   带开发者工具、允许打开存档目录
@@ -18,7 +18,7 @@ const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 
 const APP_ROOT = path.join(__dirname, '..');
-const APP_NAME = '马鞍山二中模拟器';
+const APP_NAME = '中二野人实验室';
 const ICON = path.join(__dirname, 'assets', 'icon.png');
 
 const argv = process.argv.slice(1);
@@ -225,7 +225,7 @@ function registerIpc() {
   }));
 
   ipcMain.handle('mas2z:save-file', async (_event, payload = {}) => {
-    const suggested = String(payload.suggestedName || '马鞍山二中-存档.json');
+    const suggested = String(payload.suggestedName || '中二野人实验室-存档.json');
     const options = {
       title: '导出存档',
       defaultPath: suggested,
@@ -315,7 +315,7 @@ const SELF_TEST_SCRIPT = `(async () => {
   const post = (url, body) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
 
   add('preload 暴露 window.mas2z', Boolean(window.mas2z) && window.mas2z.isDesktop === true, window.mas2z ? window.mas2z.platform : 'missing');
-  add('页面标题正确', document.title.includes('马鞍山二中'), document.title);
+  add('页面标题正确', document.title.includes('中二野人实验室'), document.title);
 
   const ids = ['start-screen', 'btn-start', 'input-name', 'actions', 'stats', 'subjects', 'log', 'shop-modal', 'gallery-modal', 'ending-modal', 'btn-save', 'btn-load', 'btn-shop', 'btn-gallery'];
   const missing = ids.filter((id) => !document.getElementById(id));
