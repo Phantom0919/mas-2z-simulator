@@ -908,6 +908,54 @@ a.big {
 
 /* ---------- 日志 / 成绩单 ---------- */
 
+/* ------------------------------------------------- 下回预告（v3.4）
+ * 每周结算的一句钩子：让"下一周"值得点。只按语气分四档配色，不加动画——
+ * 它是提示，不是弹窗。
+ */
+.teaser {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin: 2px 0 10px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.teaser.hidden {
+  display: none;
+}
+
+.teaser-icon {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.teaser-text b {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  opacity: 0.62;
+}
+
+.teaser-exam {
+  border-color: rgba(240, 180, 80, 0.45);
+  background: rgba(240, 180, 80, 0.09);
+}
+
+.teaser-danger {
+  border-color: rgba(232, 96, 96, 0.45);
+  background: rgba(232, 96, 96, 0.09);
+}
+
+.teaser-story {
+  border-color: rgba(140, 150, 255, 0.45);
+  background: rgba(140, 150, 255, 0.09);
+}
+
 .log-entry {
   border-left: 2px solid var(--line);
   padding: 6px 0 6px 10px;

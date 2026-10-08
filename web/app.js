@@ -551,6 +551,23 @@ function renderActionTabs(view, tags) {
 
 /* ------------------------------------------------------------ 右栏 */
 
+/**
+ * 下回预告（v3.4）：每周结算给一句"往前看"的钩子。
+ * 引擎已经在 view.teaser 里算好了（纯函数，见 src/data/teasers.js），这里只负责画。
+ */
+function renderTeaser(view) {
+  const box = $('next-teaser');
+  const teaser = view.teaser;
+  if (!teaser) {
+    box.classList.add('hidden');
+    box.innerHTML = '';
+    return;
+  }
+  box.className = `teaser teaser-${teaser.tone ?? 'calm'}`;
+  box.innerHTML = `<span class="teaser-icon">${escapeHtml(teaser.icon)}</span>
+    <span class="teaser-text"><b>下回预告</b>${escapeHtml(teaser.text)}</span>`;
+}
+
 function renderLog(view) {
   $('log').innerHTML =
     view.log
@@ -602,6 +619,7 @@ function renderPanels(view) {
   renderNpc(view);
   renderItems(view);
   renderActions(view);
+  renderTeaser(view);
   renderLog(view);
   renderExams(view);
 }

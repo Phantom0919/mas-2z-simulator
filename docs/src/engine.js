@@ -68,6 +68,7 @@ import { ABSTRACT_EVENTS } from './data/events4.js';
 import { CAMPUS_ACHIEVEMENTS, CAMPUS_EVENTS } from './data/events5.js';
 import { CHAIN_ACHIEVEMENTS, CHAIN_EVENTS } from './data/events6.js';
 import { DAILY_ACHIEVEMENTS, DAILY_EVENTS } from './data/events7.js';
+import { nextWeekTeaser } from './data/teasers.js';
 import {
   calendarOf,
   matchesSchedule,
@@ -100,7 +101,7 @@ import {
 /** 存档格式版本（结构变了才动它）。 */
 export const VERSION = 2;
 /** 游戏版本。内容包的 `requires.app` 拿它做兼容判断；和 package.json 必须一致（有测试盯着）。 */
-export const GAME_VERSION = '3.3.0';
+export const GAME_VERSION = '3.4.0';
 
 /* ------------------------------------------------------- 内容（可热更新） */
 
@@ -3058,6 +3059,22 @@ export function viewState(game) {
       week: item.week,
     })),
     actions: listActions(game),
+    /**
+     * 下回预告（v3.4）：每周结算给一句"往前看"的钩子，不改变任何数值。
+     * 只吃一个快照，方便单独测（见 src/data/teasers.js）。
+     */
+    teaser: nextWeekTeaser({
+      status: game.status,
+      turn: game.turn,
+      phase: game.phase,
+      stats: game.stats,
+      npc: game.npc,
+      flags: game.flags,
+      chains: game.chains,
+      nextExam: exam,
+      weeksLeft: Math.max(0, weeks - game.turn),
+      grade: semester?.grade ?? 3,
+    }),
     pendingEvent: game.pendingEvent
       ? {
           id: game.pendingEvent.id,
