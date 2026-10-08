@@ -29,6 +29,7 @@ import {
   normalizeNickname,
   rankEntries,
   reproduceText,
+  resolveBackend,
   submitEntry,
   summarizeBoard,
   toRow,
@@ -479,23 +480,27 @@ test('没接后端时一切降级：不发请求、只读本机榜（离线优�
   assert.equal(called, 0, '没配置就一个请求都不许发');
 });
 
-test('配置文件本身必须合法：要么留空（离线优先），要么是 https + 像样的 anon key', () => {
+test('配置文件本身必须合法：要么留空（离线优先），要么是 https + 像样的 key', () => {
   const config = JSON.parse(read('web/content/leaderboard.json'));
-  assert.equal(config.format, 1);
-  assert.match(config.supabase.table, /^[a-z_][a-z0-9_]*$/, '表名要是合法的 Postgres 标识符');
-  assert.match(config.note, /RLS|anon/);
+  assert.equal(config.format, 1, '配置格式版本（两种后端形状都兼容）');
+  // 配置是后端中立的：新形状 backend{...}，旧形状 supabase{...} 继续认
+  const backend = resolveBackend(config);
+  assert.match(backend.table, /^[A-Za-z_][A-Za-z0-9_]*$/, '表名要是合法的标识符');
+  assert.match(config.note, /RLS|anon|离线/);
 
-  const { url, anonKey } = config.supabase;
-  if (!url && !anonKey) {
+  if (!backend.url && !backend.apiKey) {
     assert.equal(isConfigured(config), false, '留空就是没配后端');
     return;
   }
-  assert.match(url, /^https:\/\/[a-z0-9-]+\.supabase\.co$/, 'url 必须是这个 Supabase 项目的 https 地址');
-  // anon key 是 JWT：三段 base64url，第二段里能解出 role=anon
-  assert.match(anonKey, /^eyJ[\w-]+\.[\w-]+\.[\w-]+$/, 'anon key 应该是形如 JWT 的公钥');
-  const payload = JSON.parse(Buffer.from(anonKey.split('.')[1], 'base64url').toString('utf8'));
-  assert.equal(payload.role, 'anon', '前端只能放 anon key，绝不能是 service_role');
+  assert.match(backend.url, /^https:\/\/[\w.-]+$/, 'url 必须是 https 地址（Supabase 或 Cloudflare Worker）');
   assert.equal(isConfigured(config), true);
+
+  // Supabase 那版：key 必须是 anon（绝不能把 service_role 放进前端）
+  if (backend.type === 'supabase') {
+    assert.match(backend.apiKey, /^eyJ[\w-]+\.[\w-]+\.[\w-]+$/, 'anon key 应该是形如 JWT 的公钥');
+    const payload = JSON.parse(Buffer.from(backend.apiKey.split('.')[1], 'base64url').toString('utf8'));
+    assert.equal(payload.role, 'anon', '前端只能放 anon key，绝不能是 service_role');
+  }
 });
 
 test('建表 SQL 只给匿名读和插，绝不给改和删', () => {

@@ -99,7 +99,7 @@ import {
 /** 存档格式版本（结构变了才动它）。 */
 export const VERSION = 2;
 /** 游戏版本。内容包的 `requires.app` 拿它做兼容判断；和 package.json 必须一致（有测试盯着）。 */
-export const GAME_VERSION = '3.1.0';
+export const GAME_VERSION = '3.2.0';
 
 /* ------------------------------------------------------- 内容（可热更新） */
 

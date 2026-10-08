@@ -318,25 +318,49 @@ export function fromRow(row = {}) {
   });
 }
 
+/**
+ * 后端配置解析。
+ *
+ * v3.2 起配置是**后端中立**的：`backend: { type, url, apiKey, table }`。
+ * 旧的 `supabase: { url, anonKey, table }` 继续认（老配置、老存档页不用改）。
+ *
+ * 为什么要有 type：两种后端对外都暴露同一套 REST 形状（`/rest/v1/<表>`、`apikey` 头、snake_case 列名），
+ * 所以前端代码完全一样；type 只是给人和日志看的（Supabase = 有 RLS 兜底，d1 = 约束在 Worker 里）。
+ */
+export function resolveBackend(config) {
+  const raw = config?.backend ?? config?.supabase ?? {};
+  const table = String(raw.table ?? 'leaderboard').trim();
+  return {
+    type: raw.type === 'd1' ? 'd1' : 'supabase',
+    url: String(raw.url ?? '').trim(),
+    // anonKey 是 Supabase 的叫法；apiKey 是中立叫法（D1 版就是一个你自己定的口令）
+    apiKey: String(raw.apiKey ?? raw.anonKey ?? '').trim(),
+    table: /^[A-Za-z_][A-Za-z0-9_]*$/.test(table) ? table : 'leaderboard',
+  };
+}
+
 /** 没配置后端时，一切都要能降级（离线优先） */
 export function isConfigured(config) {
-  const supabase = config?.supabase;
-  return Boolean(supabase?.url && supabase?.anonKey && supabase?.table);
+  const backend = resolveBackend(config);
+  return Boolean(backend.url && backend.apiKey);
 }
 
 export function emptyConfig() {
-  return { format: LEADERBOARD_FORMAT, supabase: { url: '', anonKey: '', table: 'leaderboard' } };
+  return { format: LEADERBOARD_FORMAT, backend: { type: 'supabase', url: '', apiKey: '', table: 'leaderboard' } };
 }
 
 function endpoint(config, query = '') {
-  const base = String(config.supabase.url).replace(/\/+$/, '');
-  return `${base}/rest/v1/${encodeURIComponent(config.supabase.table)}${query}`;
+  const backend = resolveBackend(config);
+  const base = backend.url.replace(/\/+$/, '');
+  return `${base}/rest/v1/${encodeURIComponent(backend.table)}${query}`;
 }
 
 function headers(config, extra = {}) {
+  const backend = resolveBackend(config);
   return {
-    apikey: config.supabase.anonKey,
-    authorization: `Bearer ${config.supabase.anonKey}`,
+    // 两种后端都认这两个头：Supabase 用它们做 RLS 鉴权，D1 版用它当一个"共享口令"
+    apikey: backend.apiKey,
+    authorization: `Bearer ${backend.apiKey}`,
     'content-type': 'application/json',
     ...extra,
   };

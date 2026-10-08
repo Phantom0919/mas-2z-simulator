@@ -4,6 +4,44 @@
 
 ---
 
+## v3.2.0 —— 排行榜后端可以自托管（Cloudflare Worker + D1）
+
+v3.1 的排行榜把后端绑死在 Supabase 上，而 `*.supabase.co` 在部分国内网络会被按 SNI 阻断
+（TCP 通、TLS 被重置，开发机实测就是）。这一版把后端做成可换的，并且给了两个 Cloudflare 方案。
+
+### ☁️ 两种自托管后端，前端一行不用改
+
+- **A. Worker + D1（推荐）**：`tools/cloudflare/worker-d1-leaderboard.js` + `d1-schema.sql`，
+  数据在自己的 Cloudflare 账号里（免费：每天 10 万请求 / 5GB），不再需要 Supabase。
+- **B. Worker 反代 Supabase**：`tools/cloudflare/worker-supabase-proxy.js`，
+  保留现有数据与 RLS，Worker 只做白名单转发。
+- 两者**对外形状完全一样**（`GET/POST /rest/v1/<表>`、`apikey` 头、snake_case 列名），
+  所以前端只改 `web/content/leaderboard.json`：新形状 `backend: { type, url, apiKey, table }`，
+  旧的 `supabase: { url, anonKey, table }` 继续认（`src/leaderboard.js` 的 `resolveBackend()`）。
+- 想解决国内访问，最后一步都是**把自己的域名绑到 Worker 上**（步骤见
+  [`tools/cloudflare/README.md`](./tools/cloudflare/README.md)），
+  顺带附了 `wrangler.toml` 模板给喜欢命令行的人。
+
+### 🔒 没有 RLS 时，约束必须写在 Worker 里
+
+D1 版没有 Supabase 的 RLS，所以这些都在 Worker 代码里实现，并且**每条都有测试**：
+
+- 只允许 `GET / POST / OPTIONS`——**没有 update / delete 分支**，从设计上就不提供"改"和"删"；
+- 路径白名单按**路径段**匹配（写测试时抓出 `startsWith` 会把 `/rest/v1/leaderboard_evil` 放过去）；
+- 入参逐个字段校验：昵称 1~16 字（按字符数，中文算一个字）、分数 0~750、名次 1~1000、
+  收集数上限、难度 / 模式 / 对手强度枚举归一；
+  **越界一律 400，不静默夹取**（又一条测试抓出来的：`rank=0` 原本被悄悄改成 1）；
+- 同一个昵称 **60 秒内只收一条**（防刷屏，不是防作弊——前端提交防不了作弊，这点不装）；
+- `order` 参数走白名单，注入 `order=score.desc;DROP TABLE...` 只会落回默认排序。
+
+### 🔢 版本与测试
+
+- 版本号 3.2.0（`package.json` / `GAME_VERSION` / `AndroidManifest.xml` 三处一致），APK 重打。
+- 测试 362 → **383 条全绿**（`test/cloudflare.test.js` 从 10 条扩到 21 条：
+  另加 11 条 D1 后端测试，含"假 D1"和"客户端直接对着 D1 读写排序"的端到端一条）。
+
+---
+
 ## v3.1.0 —— 排行榜：问你昵称，成绩能上榜
 
 ### 🏆 排行榜（总分榜 + 收集榜）

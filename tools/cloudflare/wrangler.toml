@@ -1,0 +1,33 @@
+# Cloudflare Worker + D1 的部署模板（可选：喜欢命令行就用它）
+#
+#   npm i -g wrangler
+#   wrangler login
+#   wrangler d1 create mas2z-leaderboard         # 把返回的 database_id 填到下面
+#   wrangler d1 execute mas2z-leaderboard --remote --file tools/cloudflare/d1-schema.sql
+#   wrangler deploy --config tools/cloudflare/wrangler.toml
+#
+# 网页版部署（不用装任何东西）见同目录 README.md，两种方式效果一样。
+
+name = "mas2z-leaderboard"
+main = "worker-d1-leaderboard.js"
+compatibility_date = "2026-01-01"
+
+# 只跑在 Cloudflare 的免费套餐上
+workers_dev = true
+
+[vars]
+TABLE = "leaderboard"
+# 共享口令：前端 web/content/leaderboard.json 里的 apiKey 要填一样的值
+API_KEY = "换成你自己的一串口令"
+
+[[d1_databases]]
+binding = "DB"                 # 必须叫 DB：Worker 代码里就是用 env.DB
+database_name = "mas2z-leaderboard"
+database_id = "把 wrangler d1 create 返回的 id 填这里"
+
+# 想绑自己的域名（解决国内访问）就在控制台做：
+#   Worker → Settings → Domains & Routes → Add → Custom Domain → api.你的域名.com
+# 命令行也可以，但要先把域名接进 Cloudflare，这里留个提示不写死。
+# [[routes]]
+# pattern = "api.你的域名.com"
+# custom_domain = true

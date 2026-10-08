@@ -1,4 +1,4 @@
-# 中二野人实验室 · v3.1
+# 中二野人实验室 · v3.2
 
 一个**零依赖的 Node.js 高中生活模拟器**（原名「马鞍山二中模拟器」，v3.0 起改名——
 搜不到校名，但"中二"两个字摆在那儿，玩的人一眼知道写的是哪所学校；
@@ -14,6 +14,14 @@
 > 游戏里的校名一律只写「二中」，不对应任何一所真实中学。
 
 ---
+
+## v3.2 新增了什么
+
+| 系统 | 内容 |
+| --- | --- |
+| ☁️ **后端可换** | 排行榜支持两种自托管后端：**Cloudflare Worker + D1**（不依赖 Supabase）或 Worker 反代 Supabase；对外形状一样，**前端只改配置** |
+| 🔒 **没有 RLS 就自己上约束** | 只允许 GET/POST（改和删从设计上不提供）、路径段白名单、字段范围校验（越界 400 不夹取）、同一昵称 60 秒限流、`order` 参数白名单 |
+| 🧪 **边界有测试** | `test/cloudflare.test.js` 21 条，用假上游 + 假 D1 跑，不联网、不需要 wrangler |
 
 ## v3.1 新增了什么
 
@@ -122,7 +130,7 @@ cd mas-2z-simulator
 
 npm start            # 终端版：进入开局向导（选科 / 天赋 / 背景 / 目标）
 npm run web          # 网页版：http://127.0.0.1:3210
-npm test             # 跑测试（引擎 + 服务端 + 前端 + 发布页，360 条）
+npm test             # 跑测试（引擎 + 服务端 + 前端 + 发布页，383 条）
 npm run sim          # 数值平衡报告（9 种策略批量跑）
 npm run gallery      # 查看结局图鉴与历史战绩
 npm run pages        # 生成 / 更新官方发布页（docs/）
@@ -251,11 +259,17 @@ node tools/check-leaderboard.mjs
 > 如果全服榜对你很重要，可选：给 Supabase 配自定义域名（付费功能，需要自己有域名）、
 > 或者换成国内后端（腾讯云开发 / 自建 + 备案域名）。
 
-> 🛠️ **想让国内也能稳定看到榜单**：最省事的做法是**套一层自己的域名**——
-> 仓库里已经附好了一个 Cloudflare Worker 反向代理（保留 Supabase 和 RLS，前端只改配置里的 `url`）：
-> 见 [`tools/cloudflare/README.md`](./tools/cloudflare/README.md)（贴代码 → 配 2 个环境变量 →
-> 绑自定义域名 → 跑自检，约 10 分钟）。代理是白名单化的（只转发 GET/POST、只认榜单那一个路径前缀），
-> 边界由 `test/cloudflare.test.js` 的 10 条测试盯着——用假上游跑，不需要联网也不需要 wrangler。
+> 🛠️ **想让国内也能稳定看到榜单**：最省事的做法是**套一层自己的域名**，仓库里两种后端都备好了：
+>
+> | 路线 | 代码 | 说明 |
+> | --- | --- | --- |
+> | **A. Cloudflare Worker + D1**（推荐） | [`tools/cloudflare/worker-d1-leaderboard.js`](./tools/cloudflare/worker-d1-leaderboard.js) + [`d1-schema.sql`](./tools/cloudflare/d1-schema.sql) | 数据在自己的 Cloudflare 账号里（免费：每天 10 万请求 / 5GB），不要 Supabase；"只能读和插、字段校验、同一昵称 60 秒一条"全在 Worker 里 |
+> | B. Worker 反代 Supabase | [`tools/cloudflare/worker-supabase-proxy.js`](./tools/cloudflare/worker-supabase-proxy.js) | 保留现有数据和 RLS，Worker 只做白名单转发 |
+>
+> 两种对外形状一样（`/rest/v1/<表>`、`apikey` 头、snake_case 列名），所以**前端只改配置文件**：
+> 新形状 `backend: { type, url, apiKey, table }`，旧的 `supabase: { url, anonKey, table }` 继续认。
+> 部署步骤见 [`tools/cloudflare/README.md`](./tools/cloudflare/README.md)（约 10 分钟）；
+> 边界由 `test/cloudflare.test.js` 的 **21 条**测试盯着（假上游 + 假 D1，不联网、不需要 wrangler）。
 > 前提同样是：**得有一个域名**；`*.workers.dev` 在国内一样经常打不开，等于没解决。
 
 | 榜 | 排序规则 | 给谁看 |
@@ -806,6 +820,8 @@ run_class:    { grade: [1], note: '班干部竞选只在高一' },
 │   ├── build-pages.mjs   # 生成发布页：试玩副本 + APK + 推送源 + 排行榜配置 + 可上传的 zip（零依赖写法）
 │   ├── build-pages-shots.py  # 截图转 JPEG + 生成 OG 分享图（需要 Pillow）
 │   ├── leaderboard-schema.sql  # 排行榜建表 SQL（Supabase：建表 + 索引 + RLS 只读只插）
+│   ├── check-leaderboard.mjs   # 排行榜后端自检：读 → 写 → 改/删必须失败 → 再读
+│   ├── cloudflare/       # 两种自托管后端：D1 版 Worker（推荐）/ Supabase 反代 Worker + D1 建表 + 部署说明
 │   ├── serve-pages.mjs   # 本地预览发布页（正确 MIME、APK 可下载、手机可连）
 │   ├── android-sdk.mjs   # 一键装 Android SDK（不需要 Android Studio / Gradle）
 │   ├── build-apk.mjs     # 免 Gradle 直接出 APK（aapt2 + javac + d8 + zipalign + apksigner）
@@ -832,12 +848,15 @@ run_class:    { grade: [1], note: '班干部竞选只在高一' },
     │                     #   结局分享文案 / 安卓外链交给系统 / APK 内容登记）
     ├── versus.test.js    # 18 个 v3.0 AI 对战测试（时间线逐拍对齐 / 随机流隔离 / 可复现 /
     │                     #   考试同榜 / 强度阶梯 / 结局总结 / 等效分 / 存档往返 / 两端接口 / CLI）
-    └── leaderboard.test.js # 22 个 v3.1 排行榜测试（昵称规范化 / 条目校验 / 两个榜的排序与并列 /
-                            #   同昵称去重 / 可复核文案 / 假 Supabase 端到端 / 没配后端不发请求 /
-                            #   403 与断网降级 / 界面与打包守门 / RLS 不许有 update·delete）
+    ├── leaderboard.test.js # 22 个 v3.1 排行榜测试（昵称规范化 / 条目校验 / 两个榜的排序与并列 /
+    │                       #   同昵称去重 / 可复核文案 / 假 Supabase 端到端 / 没配后端不发请求 /
+    │                       #   403 与断网降级 / 界面与打包守门 / RLS 不许有 update·delete）
+    └── cloudflare.test.js  # 21 个 v3.2 后端测试（代理：方法·路径段白名单 / CORS / 透传 / 502；
+                            #   D1：改删不提供 / 字段越界 400 / 枚举归一 / 60 秒限流 / order 注入 /
+                            #   客户端对着 D1 读写排序的端到端。假上游 + 假 D1，不联网）
 ```
 
-一共 **360 个测试**，`npm test` 全部通过（成品包的布局检查在没有产物时会自动跳过）。
+一共 **383 个测试**，`npm test` 全部通过（成品包的布局检查在没有产物时会自动跳过）。
 其中最有用的一个是 `android.test.js` 的最后一条：它把打好的 APK **解包**，
 直接 import 里面那份 `local-api.js` 打一局（含高考后的志愿填报）—— 只要 APK 少打包了任何一个模块，
 测试就会红，而不是等用户装到手机上看到白屏。
@@ -894,8 +913,8 @@ index.html?demo=60&mode=versus&rival=hard&weeks=3&volunteers=0
 
 | 产物 | 命令 | 大小 | 用途 |
 | --- | --- | --- | --- |
-| `dist/中二野人实验室-3.1.0-debug.apk` | `npm run apk` | 0.49 MB | 安卓侧载包（含热更新 + 推送 + 交流入口 + AI 对战 + 排行榜） |
-| `dist/中二野人实验室-3.1.0-发布页.zip` | `npm run pages` | 1.4 MB | 官方发布页：解压后推到 GitHub Pages（含在线试玩 + 排行榜 + APK） |
+| `dist/中二野人实验室-3.2.0-debug.apk` | `npm run apk` | 0.49 MB | 安卓侧载包（含热更新 + 推送 + 交流入口 + AI 对战 + 排行榜） |
+| `dist/中二野人实验室-3.2.0-发布页.zip` | `npm run pages` | 1.4 MB | 官方发布页：解压后推到 GitHub Pages（含在线试玩 + 排行榜 + APK） |
 | `dist/desktop/…-安装版.exe` | `npm run installer` | 78 MB | Windows：双击安装，带向导/快捷方式/卸载 |
 | `dist/desktop/…-win-x64.zip` | `npm run desktop:portable` | 110 MB | Windows：免安装绿色版，解压即玩 |
 
@@ -989,9 +1008,9 @@ v2.1 的存档里没有人物阵容和剧情记录，读进来会按种子把同
   代词用 `${cast.deskmate.ta}`，**不要写死"张昊""王老师"**——那些名字每局都不一样
   （而且玩家可以自己给同桌起名，写死了就会串戏）。
   `week` 是"第几周之后才能触发"，一条线里要保持递增。
-- **调平衡之外别忘的三件事**：`npm test`（360 个测试，包含剧情结构、姓名生成、
-  自制人物、内容包、事件日历、AI 对战的时间线与随机流隔离、排行榜的排序与后端降级，
-  以及发布页的链接 / 素材 / 交互守门测试）、
+- **调平衡之外别忘的三件事**：`npm test`（383 个测试，包含剧情结构、姓名生成、
+  自制人物、内容包、事件日历、AI 对战的时间线与随机流隔离、排行榜的排序与后端降级、
+  两种自托管后端的边界（白名单 / 校验 / 限流），以及发布页的链接 / 素材 / 交互守门测试）、
   `python tools/build-pages-shots.py && node tools/build-pages.mjs`（界面改过之后重出发布页素材与产物）、
   `node tools/preview-relations.mjs` + `python tools/svg-preview.py`（不用开浏览器就能看关系树排版）。
 - **不知道该做什么的时候**：翻 [ROADMAP.md](./ROADMAP.md)，那里按 P0/P1/P2 排了短期 / 中期 / 长期建议，
