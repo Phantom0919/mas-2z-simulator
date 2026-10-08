@@ -309,3 +309,38 @@ test('故事线渲染：已解锁带正文，未解锁上锁，没有 undefined'
   assert.ok(unlocked.length > 0);
   assert.ok(html.includes(unlocked[0].title));
 });
+
+/* ------------------------------------------------ 开局 / 再来一局的契约 */
+
+/**
+ * 回归：v3.2 之前「玩了一把，第二把玩不起来」。
+ *
+ * 两个原因叠在一起，都在这里钉住：
+ *   1. backToStart() 只切界面，没重绘开局表单 → 「开始三年」停在上一帧算出来的 disabled；
+ *   2. 弹层是 closeModals() / hideRunModals() 各关几个，总有漏的 ——
+ *      从结局页开过图鉴/角色卡再点「再来一局」，那些层还盖在开局界面上（看得见点不动）。
+ */
+test('再来一局必须关掉所有弹层并重绘开局表单（第二把玩得起来）', () => {
+  const app = readFileSync(new URL('../web/app.js', import.meta.url), 'utf8');
+
+  assert.match(app, /function hideAllOverlays\(/, '应该有统一的弹层清理函数');
+  assert.match(app, /querySelectorAll\('\.overlay'\)/, 'hideAllOverlays 要遍历所有 .overlay，而不是逐个登记');
+
+  const backToStart = /function backToStart\(\)\s*\{([\s\S]*?)\n\}/.exec(app)?.[1] ?? '';
+  assert.ok(backToStart.length > 0, '找不到 backToStart');
+  assert.match(backToStart, /hideAllOverlays\(\)/, 'backToStart 必须关掉所有弹层');
+  assert.match(backToStart, /renderBuildForm\(\)/, 'backToStart 必须重绘开局表单（否则按钮状态是陈旧的）');
+  assert.ok(!/hideRunModals\(\)/.test(backToStart), '不该再用那个"只关一部分"的函数');
+
+  // 开局成功 / 读档成功也要把弹层清干净（问昵称那层不能在游戏进行中挂着）
+  const startNew = /async function startNew\(\)\s*\{([\s\S]*?)\n\}/.exec(app)?.[1] ?? '';
+  assert.match(startNew, /hideAllOverlays\(\)/, '开局成功后要清空弹层');
+  assert.match(startNew, /\$\('start-screen'\)\.classList\.add\('hidden'\)/);
+  const resumeSave = /async function resumeSave\(\)\s*\{([\s\S]*?)\n\}/.exec(app)?.[1] ?? '';
+  assert.match(resumeSave, /hideAllOverlays\(\)/, '读档成功后也要清空弹层');
+
+  // 「开始三年」的可用状态只能由 updateBuildHint 决定；而它会被 renderBuildForm 调到
+  assert.match(app, /\$\('btn-start'\)\.disabled = problems\.length > 0/, 'btn-start 的禁用状态由 updateBuildHint 统一决定');
+  const renderBuildForm = /function renderBuildForm\(\)\s*\{([\s\S]*?)\n\}/.exec(app)?.[1] ?? '';
+  assert.match(renderBuildForm, /updateBuildHint\(\)/, 'renderBuildForm 必须顺手刷新提示与按钮状态');
+});

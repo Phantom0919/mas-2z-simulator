@@ -69,7 +69,7 @@
         <div class="hero-glow" aria-hidden="true"></div>
         <div class="wrap hero-inner">
           <p class="badge-row">
-            <span class="badge" data-version-badge>v3.2.0</span>
+            <span class="badge" data-version-badge>v3.2.1</span>
             <span class="badge">网页 / 安卓 / 桌面 / 终端</span>
             <span class="badge">免费 · 无广告 · 无内购</span>
             <span class="badge">不联网也能玩</span>
@@ -264,7 +264,7 @@
               <h3>🤖 安卓版 APK</h3>
               <p class="plan-desc">
                 约 <span data-apk-size>0.5 MB</span>，不用装任何框架。装的时候系统会提示「未知来源应用」——因为它是个人项目、
-                没有上架商店。版本 <span data-apk-version>v3.2.0</span>。
+                没有上架商店。版本 <span data-apk-version>v3.2.1</span>。
               </p>
               <p class="plan-actions">
                 <a class="btn btn-primary" href="./download/中二野人实验室-安卓版.apk" download>⬇ 下载 APK</a>
@@ -295,6 +295,18 @@ npm run web      # 网页版（本地服务）</code></pre>
           <p class="section-sub">每个版本都做完整回归测试后才发；发版之后还能靠内容包继续加东西。</p>
 
           <ol class="timeline">
+            <li>
+              <span class="tl-ver">v3.2.1</span>
+              <div class="tl-body">
+                <h3>修掉「玩了一把，第二把玩不起来」</h3>
+                <p>
+                  点「再来一局」之后，如果有别的弹层没关干净（图鉴、角色卡…），它们会盖在开局界面上，
+                  「开始三年」看得见点不动；而且按钮的可用状态是上一帧算出来的，用分享链接开局的玩家会卡在
+                  永远点不动的状态。现在回到开局界面会<strong>一次关掉所有弹层并重绘开局表单</strong>，
+                  可以直接开第二局（沿用上一局的构筑，想改哪项改哪项）。这条有回归测试盯着。
+                </p>
+              </div>
+            </li>
             <li>
               <span class="tl-ver">v3.2</span>
               <div class="tl-body">
@@ -578,7 +590,7 @@ npm run web      # 网页版（本地服务）</code></pre>
           <div>
             <p class="footer-title">中二野人实验室</p>
             <p class="footer-sub">
-              <span data-version-badge>v3.2.0</span> · 厚德 · 励学 · 敦行
+              <span data-version-badge>v3.2.1</span> · 厚德 · 励学 · 敦行
             </p>
           </div>
         </div>

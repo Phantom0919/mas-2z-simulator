@@ -4,6 +4,44 @@
 
 ---
 
+## v3.2.1 —— 修掉「玩了一把，第二把玩不起来」
+
+### 🐛 两个原因叠在一起
+
+用无头浏览器把整条链路跑了一遍（打完一局 → 再来一局 → 开始三年），复现出来的现象是：
+
+```
+点「再来一局」后：start-screen 显示，但顶层还有：start-screen, nickname-modal
+  btn-start disabled=true
+  build-hint=⚠️ 再选科目必须正好选 2 门（还差 2 门）；天赋必须正好选 2 个（还差 2 个）
+```
+
+1. **弹层没关干净**：`backToStart()` 只调了 `closeModals()` / `hideRunModals()`，这俩各关几个、还都不管
+   `cards-modal` / `gallery-modal` / `shop-modal` / `nickname-modal`。从结局页开过「图鉴」再点「再来一局」，
+   图鉴那层就盖在开局界面上——**和更新横幅那次是同一类 bug：看得见点不动比看不见更糟**。
+2. **开局表单没重绘**：`btn-start` 的禁用状态由 `updateBuildHint()` 决定，而它只在 `renderBuildForm()` 里跑。
+   回到开局界面时不重绘，按钮就停在上一次算出来的状态。**用 `?demo` 分享链接开局的玩家最惨**：
+   选科/天赋是绕过表单设的，提示里永远写着"还差 2 门"，"开始三年"永久禁用——正是"第一把能玩、第二把玩不起来"。
+
+### ✅ 修法
+
+- 新增 `hideAllOverlays()`：**统一遍历 `.overlay` 全部关掉**（只留开局界面本身）。
+  以后新增弹层不用再回来登记；`startNew` / `resumeSave` 成功之后也走它——
+  问昵称那层不会再挂在游戏上面。
+- `backToStart()` 里补上 `renderBuildForm()`：回到开局界面时把表单和提示重绘一遍，
+  按钮的可用状态立刻正确。玩家第二局**沿用上一局的构筑**（选科/天赋/属性点/难度/周数/玩法都还在），
+  想改哪项就改哪项，直接点「开始三年」也能开。
+- 回归测试（`test/web.test.js`）：钉住"`backToStart` 必须调 `hideAllOverlays()` + `renderBuildForm()`"、
+  "弹层清理必须遍历 `.overlay` 而不是逐个登记"、"开局/读档成功后也要清空弹层"、
+  "`btn-start` 的禁用状态只能由 `updateBuildHint` 决定"。
+
+### 🔢 版本
+
+- 版本号 3.2.1（`package.json` / `GAME_VERSION` / `AndroidManifest.xml` 一致），APK 与发布页重出。
+- 测试 383 → **384 条全绿**。
+
+---
+
 ## v3.2.0 —— 排行榜后端可以自托管（Cloudflare Worker + D1）
 
 v3.1 的排行榜把后端绑死在 Supabase 上，而 `*.supabase.co` 在部分国内网络会被按 SNI 阻断

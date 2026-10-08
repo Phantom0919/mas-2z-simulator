@@ -1392,9 +1392,10 @@ async function startNew() {
     const data = await api('/api/new', { method: 'POST', body: payload });
     state.gameId = data.gameId;
     state.recorded = null;
-    hideRunModals();
+    // 开局成功就把所有弹层收干净：包括"第一次进来问昵称"那层——
+    // 用 ?demo 分享链接进来时它一直挂在最上层，会挡住新开的这一局
+    hideAllOverlays();
     $('start-screen').classList.add('hidden');
-    $('ending-modal').classList.add('hidden');
     render(data.view);
     await persist();
   });
@@ -1410,9 +1411,8 @@ async function resumeSave() {
     const data = await api('/api/import', { method: 'POST', body: { save: raw } });
     state.gameId = data.gameId;
     state.recorded = null;
-    hideRunModals();
+    hideAllOverlays();
     $('start-screen').classList.add('hidden');
-    $('ending-modal').classList.add('hidden');
     render(data.view);
   });
 }
@@ -2878,10 +2878,33 @@ async function importSaveFromDesktop() {
 
 /* ------------------------------------------------------------ 启动 */
 
+/**
+ * 把"除了开局界面以外"的所有弹层收干净。
+ *
+ * 以前是 closeModals() + hideRunModals() 两个函数各关几个，结果**总有漏的**：
+ * 从结局页开过「图鉴」「角色卡」再点「再来一局」，那些弹层还盖在开局界面上面，
+ * "开始三年"看得见点不动——和更新横幅那次是同一类 bug（看得见点不动比看不见更糟）。
+ * 现在统一遍历 `.overlay`，以后新增弹层不用再回来登记。
+ */
+function hideAllOverlays(keep = ['start-screen']) {
+  for (const overlay of document.querySelectorAll('.overlay')) {
+    if (keep.includes(overlay.id)) continue;
+    overlay.classList.add('hidden');
+  }
+}
+
 function backToStart() {
-  hideRunModals();
-  $('ending-modal').classList.add('hidden');
+  hideAllOverlays();
   $('start-screen').classList.remove('hidden');
+  /*
+   * 关键：回到开局界面必须**重绘一次开局表单**。
+   *
+   * 玩家的第二局常常是"照上一局的构筑再来一次"，而 updateBuildHint() 决定
+   * 「开始三年」可不可点。不重绘的话按钮会停在上一帧算出来的状态：
+   * 用 ?demo 分享链接开局的玩家（选科/天赋绕过了表单）回到这里就会看到
+   * 一个永远禁用的「开始三年」——"玩了一把，第二把玩不起来"就是这个。
+   */
+  renderBuildForm();
   updateContinueButton();
 }
 
