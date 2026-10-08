@@ -370,6 +370,8 @@ export function createGameServer({
           rivalLevel: body.rivalLevel,
           // 高考之后要不要走志愿填报（分享"最短一局"的链接会关掉；默认开着）
           volunteers: body.volunteers,
+          // 周目继承（v3.5）：只转发 id，createGame 那边按白名单核对
+          inherit: body.inherit,
         });
         const gameId = store.create(game);
         sendJson(res, 200, { gameId, lines: [], view: viewState(game) });

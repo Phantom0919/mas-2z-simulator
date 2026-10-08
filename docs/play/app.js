@@ -28,6 +28,7 @@ import {
   fetchBoard,
   summarizeBoard,
 } from '../src/leaderboard.js';
+import { deriveInheritance } from '../src/legacy.js';
 import { summarizeUpdate } from '../src/update.js';
 import {
   castCardHtml,
@@ -1146,6 +1147,35 @@ function renderBuildForm() {
 
   $('trait-count').textContent = `　已选 ${state.draft.traits.length}/${traitLimit()}`;
   updateBuildHint();
+  renderInheritanceCard();
+}
+
+/**
+ * 周目继承（v3.5）：开局界面上一张卡片，说清"这一局会继承上一局的哪些选择"。
+ *
+ * 继承由**上一局的选择**（引擎写在 flags 上的决定）决定，不是按结局白送加成；
+ * 卡片上带一个开关（#inherit-on，在 index.html 里静态写好），
+ * 想玩纯新局的人可以一键关掉——关掉就不带 memoryIds 提交。
+ */
+function renderInheritanceCard() {
+  const box = $('inherit-card');
+  if (!box) return;
+  const inherit = deriveInheritance(loadProfile());
+  state.inherit = inherit;
+
+  if (inherit.memories.length === 0) {
+    box.classList.add('hidden');
+    $('inherit-list').innerHTML = '';
+    return;
+  }
+  box.classList.remove('hidden');
+  $('inherit-list').innerHTML = inherit.memories
+    .map(
+      (memory) => `<li><span class="inherit-icon">${escapeHtml(memory.icon)}</span>
+        <span><b>${escapeHtml(memory.name)}</b>　${escapeHtml(memory.desc)}</span></li>`,
+    )
+    .join('');
+  $('inherit-on').checked = state.inheritOn !== false;
 }
 
 /** 只刷新底部的提示与"开始三年"按钮。 */
@@ -1405,6 +1435,8 @@ async function startNew() {
     rivalLevel: draft.mode === 'versus' ? draft.rivalLevel : undefined,
     // 只有分享链接会关掉志愿填报（?volunteers=0），正常开局一律走完整流程
     volunteers: draft.volunteers === false ? false : undefined,
+    // 周目继承（v3.5）：只传 id，服务端按白名单核对
+    inherit: state.inheritOn === false ? { enabled: false } : { memoryIds: (state.inherit?.memories ?? []).map((memory) => memory.id) },
   };
   await guard($('start-screen'), async () => {
     const data = await api('/api/new', { method: 'POST', body: payload });
@@ -1605,6 +1637,9 @@ function loadProfile() {
       runs: Number(data.runs) || 0,
       unlocked: data.unlocked && typeof data.unlocked === 'object' ? data.unlocked : {},
       history: Array.isArray(data.history) ? data.history : [],
+      // v3.5 周目继承：上一局写下了哪些"选择记忆"，以及累计成就数
+      achievementCount: Number(data.achievementCount) || 0,
+      lastRun: data.lastRun && typeof data.lastRun === 'object' ? data.lastRun : null,
     };
   } catch {
     return emptyProfile();
@@ -1649,6 +1684,19 @@ function recordRun(view) {
     at: entry.at,
   });
   profile.history = profile.history.slice(0, 30);
+
+  /*
+   * 周目继承（v3.5）：把这一局实际写下的"选择记忆"存下来，下一局开局用。
+   * 存的是 id（不是数值），下一局能不能用由 src/legacy.js 的白名单说了算。
+   */
+  profile.achievementCount = (profile.achievementCount ?? 0) + (ending.achievements ?? []).length;
+  profile.lastRun = {
+    endingId: ending.id,
+    endingTitle: ending.title,
+    total: ending.total ?? null,
+    memories: Array.isArray(view.earnedMemories) ? view.earnedMemories : [],
+    at: entry.at,
+  };
   saveProfile(profile);
 }
 
@@ -2928,6 +2976,11 @@ function backToStart() {
 
 function bind() {
   $('btn-start').addEventListener('click', startNew);
+  // 周目继承的开关：关掉就是纯新局（只影响提交时带不带 memoryIds）
+  $('inherit-on').addEventListener('change', (event) => {
+    state.inheritOn = event.target.checked;
+    toast(state.inheritOn ? '这一局会带上继承。' : '这一局从零开始，不继承。');
+  });
   $('btn-continue').addEventListener('click', resumeSave);
   $('btn-new').addEventListener('click', backToStart);
   $('btn-restart').addEventListener('click', backToStart);

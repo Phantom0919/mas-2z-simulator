@@ -69,6 +69,7 @@ import { CAMPUS_ACHIEVEMENTS, CAMPUS_EVENTS } from './data/events5.js';
 import { CHAIN_ACHIEVEMENTS, CHAIN_EVENTS } from './data/events6.js';
 import { DAILY_ACHIEVEMENTS, DAILY_EVENTS } from './data/events7.js';
 import { nextWeekTeaser } from './data/teasers.js';
+import { applyInheritance, memoryIdsForFlags } from './legacy.js';
 import {
   calendarOf,
   matchesSchedule,
@@ -101,7 +102,7 @@ import {
 /** 存档格式版本（结构变了才动它）。 */
 export const VERSION = 2;
 /** 游戏版本。内容包的 `requires.app` 拿它做兼容判断；和 package.json 必须一致（有测试盯着）。 */
-export const GAME_VERSION = '3.4.0';
+export const GAME_VERSION = '3.5.0';
 
 /* ------------------------------------------------------- 内容（可热更新） */
 
@@ -1415,6 +1416,16 @@ export function createGame(options = {}) {
   game.stats.mood = clamp(game.stats.mood, 1, 100);
   game.stats.social = clamp(game.stats.social, 0, 100);
   game.stats.comprehensive = clamp(game.stats.comprehensive, 0, 100);
+
+  /*
+   * 周目继承（v3.5）：把上一局**选择**留下的记忆应用到开局。
+   *
+   * 必须排在**开局底子与属性点都落账之后**：早一步加的知识会被随机底子覆盖掉
+   * （第一版就踩了这个坑，测试直接指出来了）。它是"起点略有不同"，不是改规则——
+   * 难度、周数、随机种子都不受影响；id 走白名单（见 src/legacy.js），
+   * 所以前端传别的 id 进来也没用，不会变成注入属性的后门。
+   */
+  applyInheritance(game, options.inherit);
 
   game.startProfile = {
     lopsided: Boolean(start.lopsided),
@@ -3059,6 +3070,10 @@ export function viewState(game) {
       week: item.week,
     })),
     actions: listActions(game),
+    /** 这一局实际写下了哪些"选择记忆"（v3.5）：前端存进档案，下一局开局继承用。 */
+    earnedMemories: memoryIdsForFlags(game.flags),
+    /** 本局开局继承了什么（没继承就是空数组）。 */
+    inherited: game.inherit?.memoryIds ?? [],
     /**
      * 下回预告（v3.4）：每周结算给一句"往前看"的钩子，不改变任何数值。
      * 只吃一个快照，方便单独测（见 src/data/teasers.js）。

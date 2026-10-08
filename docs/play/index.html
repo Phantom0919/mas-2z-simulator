@@ -142,6 +142,18 @@
           三年后的结局，从这一页就开始写了。
         </p>
 
+        <!-- 周目继承（v3.5）：上一局的选择会长成这一局的起点，可以一键关掉 -->
+        <div id="inherit-card" class="inherit-card hidden">
+          <div class="inherit-head">
+            <b>🎒 继承自上一局</b>
+            <label class="inherit-toggle">
+              <input type="checkbox" id="inherit-on" checked />
+              <span>本局继承</span>
+            </label>
+          </div>
+          <ul class="inherit-list" id="inherit-list"></ul>
+        </div>
+
         <div class="creator-toolbar">
           <button type="button" id="btn-random-all" class="ghost" title="随机生成一整个人">🎲 随机捏一个</button>
           <button type="button" id="btn-reset-creator" class="ghost" title="全部恢复默认">↺ 全默认</button>

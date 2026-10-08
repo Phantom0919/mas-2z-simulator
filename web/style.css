@@ -908,6 +908,59 @@ a.big {
 
 /* ---------- 日志 / 成绩单 ---------- */
 
+/* ------------------------------------------------- 周目继承（v3.5）
+ * 开局界面上的继承卡片：说清"上一局的哪些选择会长成这一局的起点"，带开关。
+ */
+.inherit-card {
+  margin: 4px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(140, 150, 255, 0.4);
+  border-radius: 10px;
+  background: rgba(140, 150, 255, 0.08);
+  font-size: 13px;
+}
+
+.inherit-card.hidden {
+  display: none;
+}
+
+.inherit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.inherit-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.inherit-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+}
+
+.inherit-list li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+
+.inherit-icon {
+  flex: none;
+}
+
+
 /* ------------------------------------------------- 下回预告（v3.4）
  * 每周结算的一句钩子：让"下一周"值得点。只按语气分四档配色，不加动画——
  * 它是提示，不是弹窗。

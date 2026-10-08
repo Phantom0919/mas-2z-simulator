@@ -371,6 +371,8 @@ export function createLocalApi() {
           rivalLevel: body.rivalLevel,
           // 高考之后要不要走志愿填报（CLI 早就有了，网页/APK 这一版才接上）
           volunteers: body.volunteers,
+          // 周目继承（v3.5）：只转发 id，createGame 那边按白名单核对
+          inherit: body.inherit,
         });
         return { gameId: 'local', lines: [], view: viewState(game) };
       }
