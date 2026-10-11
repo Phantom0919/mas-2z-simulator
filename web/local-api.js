@@ -20,6 +20,7 @@ import {
   endingCatalog,
   performAction,
   pickNickname,
+  placeExamBet,
   randomStudentName,
   relationGraph,
   renderTreeText,
@@ -399,6 +400,17 @@ export function createLocalApi() {
 
       if (route === '/api/view') {
         return { view: viewState(requireGame()) };
+      }
+
+      if (route === '/api/exam-bet') {
+        // 考前押卷（v3.6）：离线版必须和服务端同形状——
+        // "网页有、安卓没有"这个坑在内容包和志愿填报上已经踩过两次了。
+        const current = requireGame();
+        if (typeof engineApi.placeExamBet !== 'function') {
+          throw new GameError('这一版离线引擎还没有考前押卷，请更新到最新版。');
+        }
+        const result = engineApi.placeExamBet(current, { mode: body.mode, subject: body.subject });
+        return { lines: result.lines ?? [], view: viewState(current) };
       }
 
       if (route === '/api/action') {

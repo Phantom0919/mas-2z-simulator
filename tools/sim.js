@@ -135,6 +135,12 @@ function runMatrix() {
     `难度 ${difficulty}　${trackName}　每学期 ${weeks} 周（一局 ${weeks * 6} 周 × 2 段）　每种策略 ${runs} 局` +
       `${endless ? '　自由模式' : ''}　目标：${goalName}\n`,
   );
+  /*
+   * 押卷口径（v3.6）：这里的策略**都不下注**，所以下面每一行都是"从不押卷"的成绩。
+   * 押卷是对称的（押中 ×1.25 / 押错 ×0.72 且多掉知识），混合口径会把两种局搅在一起，
+   * 所以这张表只报纯净曲线；要量押卷的影响就单独写脚本，别混进这张表。
+   */
+  console.log('押卷口径：全部不下注（从不押卷的纯养成曲线）\n');
 
   const STUDY_ACTIONS = new Set(['listen', 'drill', 'preview', 'cram', 'tutor', 'help', 'contest', 'review_notes', 'study_together']);
   const header = ['策略', '平均分', '中位', '最低', '最高', '清北', '985+', '好结局', '本科率', '崩溃', '目标达成', '知识均值', '学习回合', '心情', '疲劳'];

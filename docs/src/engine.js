@@ -69,6 +69,25 @@ import { CAMPUS_ACHIEVEMENTS, CAMPUS_EVENTS } from './data/events5.js';
 import { CHAIN_ACHIEVEMENTS, CHAIN_EVENTS } from './data/events6.js';
 import { DAILY_ACHIEVEMENTS, DAILY_EVENTS } from './data/events7.js';
 import { nextWeekTeaser } from './data/teasers.js';
+import {
+  BET_ACHIEVEMENTS,
+  BET_MAP,
+  BET_MODES,
+  EXAM_BETS,
+  FOCUS_BACKFIRE_WEEKS,
+  GAMBLE_MISS_FATIGUE,
+  GAMBLE_MISS_MOOD,
+  REST_FATIGUE,
+  REST_MOOD,
+  backfireOf,
+  betRoll,
+  chanceFor,
+  focusChance,
+  gambleChance,
+  hitFactor,
+  missFactor,
+  normalizeBet,
+} from './data/exam-bets.js';
 import { applyInheritance, memoryIdsForFlags } from './legacy.js';
 import {
   calendarOf,
@@ -102,7 +121,7 @@ import {
 /** 存档格式版本（结构变了才动它）。 */
 export const VERSION = 2;
 /** 游戏版本。内容包的 `requires.app` 拿它做兼容判断；和 package.json 必须一致（有测试盯着）。 */
-export const GAME_VERSION = '3.5.0';
+export const GAME_VERSION = '3.6.0';
 
 /* ------------------------------------------------------- 内容（可热更新） */
 
@@ -1365,6 +1384,9 @@ export function createGame(options = {}) {
     volunteerMode: options.volunteers !== false,
     /** 因果链：几周之后要长出后果的选择。 */
     chains: [],
+    /** 考前押卷（v3.6）：这一场押了什么 + 这一局押过的每一场。 */
+    examBet: freshExamBet(),
+    examBets: [],
     /** 玩法：'solo' | 'versus'（见 MODES）。 */
     mode,
     /** AI 对战的对手（单人模式是 null）。 */
@@ -1518,6 +1540,293 @@ export function nextExamInfo(game) {
 
 export function subjectsOf(game) {
   return game.subjectKeys.map((key) => SUBJECT_MAP[key]).filter(Boolean);
+}
+
+/* ------------------------------------------------------- 考前押卷（v3.6） */
+
+/** 押卷的窗口：考试前 1 周内可以押（考试那一周也还来得及，考完就不能改）。 */
+const BET_WINDOW_WEEKS = 1;
+
+/** 一局里下过多少注就发「每场都赌」那个成就（12 场考试，留点余地）。 */
+const BET_ALLIN_AT = 10;
+
+/** 干净的押卷初值（新开一局 / 一场考完之后都回到这里）。 */
+function freshExamBet() {
+  return { mode: 'none', subject: null, subjectName: null, placedTurn: null, decided: false, hit: null, chance: null };
+}
+
+/** 读档时的白名单清洗：手改过的存档不能把奇怪的 mode/科目带进引擎。 */
+function sanitizeExamBet(input, subjectKeys = []) {
+  const clean = freshExamBet();
+  if (!input || typeof input !== 'object' || !BET_MODES.includes(input.mode)) return clean;
+  const subject = input.mode === 'focus' && subjectKeys.includes(input.subject) ? input.subject : null;
+  if (input.mode === 'focus' && !subject) return clean;
+  clean.mode = input.mode;
+  clean.subject = subject;
+  clean.subjectName = subject ? SUBJECT_MAP[subject]?.name ?? subject : null;
+  clean.placedTurn = Number.isFinite(input.placedTurn) ? input.placedTurn : null;
+  clean.decided = input.decided === true;
+  clean.hit = typeof input.hit === 'boolean' ? input.hit : null;
+  clean.chance = Number.isFinite(input.chance) ? clamp(input.chance, 0, 1) : null;
+  return clean;
+}
+
+/** 押卷历史：只保留认得的字段，条数也设上限（自由模式能无限考）。 */
+function sanitizeExamBets(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((entry) => entry && typeof entry === 'object' && BET_MODES.includes(entry.mode))
+    .slice(-60)
+    .map((entry) => ({
+      name: String(entry.name ?? '考试'),
+      kind: String(entry.kind ?? 'mid'),
+      mode: entry.mode,
+      modeName: betModeName(entry.mode),
+      subject: typeof entry.subject === 'string' ? entry.subject : null,
+      subjectName: entry.subjectName ?? null,
+      hit: typeof entry.hit === 'boolean' ? entry.hit : null,
+      factor: Number.isFinite(entry.factor) ? entry.factor : 1,
+      chance: Number.isFinite(entry.chance) ? entry.chance : null,
+      note: String(entry.note ?? ''),
+    }));
+}
+
+function betContext(game, subject = null) {
+  return {
+    comprehensive: game.stats.comprehensive ?? 50,
+    weakKeys: game.startProfile?.weakKeys ?? [],
+    subject,
+  };
+}
+
+function betModeName(mode) {
+  return BET_MAP[mode]?.name ?? mode;
+}
+
+/**
+ * 这一场能不能押：返回 `{ ok, reason, exam }`。
+ * 不能押时 `reason` 一定是给玩家看的整句话（界面直接显示，不用自己拼）。
+ */
+function examBetReady(game) {
+  if (game.status === 'volunteering') return { ok: false, reason: '志愿表还没交，这一届的考试已经考完了。' };
+  if (game.status !== 'playing') return { ok: false, reason: '这一局已经结束了，押卷留给下一局吧。' };
+  const exam = nextExamInfo(game);
+  if (!exam) return { ok: false, reason: '这一届没有下一场考试了。' };
+  if (exam.inWeeks > BET_WINDOW_WEEKS) {
+    return { ok: false, reason: `${exam.name}还有 ${exam.inWeeks} 周，考前一星期再来押。`, exam };
+  }
+  const bet = game.examBet ?? freshExamBet();
+  if (bet.decided) {
+    const what = bet.mode === 'focus' && bet.subjectName ? `${betModeName(bet.mode)} · ${bet.subjectName}` : betModeName(bet.mode);
+    return { ok: false, reason: `${exam.name}已经押过了：${what}。考完才能知道对不对。`, exam };
+  }
+  return { ok: true, reason: '', exam };
+}
+
+/**
+ * 给界面看的押卷状态（纯读，不改任何数值）。
+ * 前端只认这里的字段——押卷不需要新增接口就能显示窗口、命中率与历史。
+ */
+export function examBetState(game) {
+  const exam = nextExamInfo(game);
+  const bet = game.examBet ?? freshExamBet();
+  const ready = examBetReady(game);
+  const weakKeys = game.startProfile?.weakKeys ?? [];
+  const subjects = game.subjectKeys.map((key) => ({
+    key,
+    name: SUBJECT_MAP[key]?.name ?? key,
+    weak: weakKeys.includes(key),
+    chance: focusChance(betContext(game, key)),
+  }));
+  const history = (game.examBets ?? []).map((entry) => ({ ...entry }));
+  const count = (mode) => history.filter((entry) => entry.mode === mode).length;
+  return {
+    available: ready.ok,
+    reason: ready.reason,
+    windowWeeks: BET_WINDOW_WEEKS,
+    exam: ready.exam
+      ? { name: ready.exam.name, kind: ready.exam.kind, week: ready.exam.week, inWeeks: ready.exam.inWeeks, semesterIndex: game.semesterIndex }
+      : null,
+    inWeeks: ready.exam?.inWeeks ?? null,
+    weakKeys: weakKeys.slice(),
+    subjects,
+    options: EXAM_BETS.map((option) => ({
+      id: option.id,
+      name: option.name,
+      icon: option.icon,
+      desc: option.desc,
+      risk: option.risk,
+      gain: option.gain,
+      needsSubject: Boolean(option.needsSubject),
+      hitChance: option.id === 'focus' ? focusChance(betContext(game)) : chanceFor(option.id, betContext(game)),
+    })),
+    placed: bet.decided
+      ? {
+          mode: bet.mode,
+          modeName: betModeName(bet.mode),
+          subject: bet.subject,
+          subjectName: bet.subjectName,
+          hitChance: bet.chance,
+          placedTurn: bet.placedTurn,
+        }
+      : null,
+    history,
+    summary: {
+      total: history.length,
+      hit: history.filter((entry) => entry.hit === true && entry.mode !== 'none' && entry.mode !== 'rest').length,
+      miss: history.filter((entry) => entry.hit === false).length,
+      focus: count('focus'),
+      gamble: count('gamble'),
+      rest: count('rest'),
+      none: count('none'),
+      bet: history.filter((entry) => entry.mode === 'focus' || entry.mode === 'gamble').length,
+    },
+  };
+}
+
+/**
+ * 下注。
+ *
+ * 三条硬规则：
+ *   1. 只能在窗口内、且这一场还没押过——第二次调用直接抛 GameError，且**不动任何数值**
+ *      （测试会拿两次快照逐项比对）；
+ *   2. 只认白名单（normalizeBet）：前端塞别的字段没用，押一个不在选考里的科目也会被拒；
+ *   3. **不消耗随机数**：这里不做命中判定，命中的骰子在考试那一刻才掷（betRoll 只读 rngState）。
+ *      「考前睡够」是唯一立刻落账的一档——它本来就不是赌，是这周的选择。
+ */
+export function placeExamBet(game, input) {
+  const ready = examBetReady(game);
+  if (!ready.ok) throw new GameError(ready.reason);
+  const clean = normalizeBet(input, game.subjectKeys);
+  if (!clean) throw new GameError('没有这个押卷选项（或者押的科目不在你的选考里）。');
+
+  const subjectName = clean.subject ? SUBJECT_MAP[clean.subject]?.name ?? clean.subject : null;
+  const chance = chanceFor(clean.mode, betContext(game, clean.subject));
+  game.examBet = {
+    mode: clean.mode,
+    subject: clean.subject,
+    subjectName,
+    placedTurn: game.turn,
+    decided: true,
+    hit: null,
+    chance,
+  };
+
+  const lines = [];
+  const before = snapshotProgress(game);
+  if (clean.mode === 'rest') {
+    game.stats.fatigue += REST_FATIGUE;
+    game.stats.mood += REST_MOOD;
+  }
+  clampAndWarn(game, lines);
+  lines.push(...describeDelta(before, game));
+
+  const percent = Math.round(chance * 100);
+  let text;
+  if (clean.mode === 'focus') {
+    text = `【${weekLabel(game)}】🔪 考前押卷：押重点 · ${subjectName}（命中率约 ${percent}%）。你把范围砍到七成，剩下的交给运气。`;
+  } else if (clean.mode === 'gamble') {
+    text = `【${weekLabel(game)}】🎲 考前押卷：押题（命中率约 ${percent}%）。你花了一整周研究"今年可能怎么出"。`;
+  } else if (clean.mode === 'rest') {
+    text = `【${weekLabel(game)}】🛌 考前押卷：考前睡够。你没押分数，把灯关了。`;
+  } else {
+    text = `【${weekLabel(game)}】🙅 考前押卷：不押。这一场就按你复习到哪算哪。`;
+  }
+  lines.unshift(text);
+  pushLog(game, 'system', `考前押卷 · ${betModeName(clean.mode)}`, text.replace(/^【[^】]+】/, ''));
+
+  if (clean.mode === 'focus' || clean.mode === 'gamble') {
+    game.flags[`betPlaced_${clean.mode}`] = true;
+    const placed = (game.examBets ?? []).filter((entry) => entry.mode === 'focus' || entry.mode === 'gamble').length + 1;
+    if (placed >= BET_ALLIN_AT) game.flags.betAllIn = true;
+  } else if (clean.mode === 'rest') {
+    game.flags.betRest = true;
+  }
+  return { lines };
+}
+
+/**
+ * 考试那一刻把赌注兑现。
+ * 返回 `null`（没押 / 不押 / 睡够）或 `{ bet, hit, factors, lines }`。
+ */
+function resolveExamBet(game, item) {
+  const bet = game.examBet;
+  if (!bet?.decided) return null;
+
+  const reset = () => {
+    game.examBet = freshExamBet();
+  };
+  // 不押 / 睡够：记一笔历史（让成绩条上看得见"这一场我没赌"），没有系数
+  if (bet.mode === 'none' || bet.mode === 'rest') {
+    (game.examBets ??= []).push({
+      name: item.name,
+      kind: item.kind,
+      mode: bet.mode,
+      modeName: betModeName(bet.mode),
+      subject: null,
+      subjectName: null,
+      hit: null,
+      factor: 1,
+      note: bet.mode === 'rest' ? '考前把状态养回来了' : '没有下注',
+    });
+    reset();
+    return null;
+  }
+
+  const chance = Number(bet.chance) || 0;
+  const hit = betRoll(game.rngState, `${game.turn}|${game.semesterIndex}|${item.kind}|${bet.mode}|${bet.subject ?? 'all'}`) < chance;
+  const factors = {};
+  const lines = [];
+  let factor = 1;
+  let note = '';
+
+  if (bet.mode === 'focus') {
+    factor = hit ? hitFactor('focus') : missFactor('focus');
+    factors[bet.subject] = factor;
+    if (hit) {
+      game.flags.betHitFocus = true;
+      lines.push(`＃ 押重点｜你的运气不错：卷子上七成题型都是你圈过的那几类。（${bet.subjectName} ×${factor}）`);
+      note = '押中了考点范围';
+    } else {
+      game.flags.betMissFocus = true;
+      game.flags.betBackfire = backfireOf(game, bet.subject, game.turn);
+      lines.push(
+        `＃ 押重点｜但这次押错了。最后那几道压轴题的类型，你一眼都没看过。` +
+          `（${bet.subjectName} ×${factor}，往后 ${FOCUS_BACKFIRE_WEEKS} 周这一科补起来格外费劲）`,
+      );
+      note = '砍掉的范围在成绩单上原形毕露';
+    }
+  } else {
+    factor = hit ? hitFactor('gamble') : missFactor('gamble');
+    for (const key of game.subjectKeys) factors[key] = factor;
+    if (hit) {
+      game.flags.betHitGamble = true;
+      lines.push(`＃ 押题｜方向对了：今年的出题路子跟你想的一样。（全科 ×${factor}）`);
+      note = '赌对了出题方向';
+    } else {
+      game.flags.betMissGamble = true;
+      game.stats.fatigue += GAMBLE_MISS_FATIGUE;
+      game.stats.mood += GAMBLE_MISS_MOOD;
+      lines.push(`＃ 押题｜押错了。你研究的那一类题一题没出，白熬一周。（全科 ×${factor}，疲劳 +${GAMBLE_MISS_FATIGUE}）`);
+      note = '白熬一周';
+      clampAndWarn(game, lines);
+    }
+  }
+
+  (game.examBets ??= []).push({
+    name: item.name,
+    kind: item.kind,
+    mode: bet.mode,
+    modeName: betModeName(bet.mode),
+    subject: bet.subject,
+    subjectName: bet.subjectName,
+    hit,
+    factor,
+    chance,
+    note,
+  });
+  reset();
+  return { bet, hit, factors, lines };
 }
 
 function phaseAllowed(action, phase) {
@@ -1936,7 +2245,15 @@ function examFatigueFactor(game) {
   return clamp(1 - over / EFF.examFatigueSlope, EFF.examFatigueFloor, 1.02);
 }
 
-function subjectScore(game, subject) {
+/**
+ * 单科得分。
+ *
+ * `factor` 是考前押卷（v3.6）带来的这一场系数：押中 >1、押错 <1、不押恒为 1。
+ * 它乘在 pct 上而不是乘在最后的分上——因为卷面满分就是上限：
+ * 一个已经把知识刷到 95 的人，押中重点也不会多出 120% 的分，这符合直觉。
+ * 注意它**不动 noise**：押卷不消耗随机数，所以同种子下押与不押的噪声完全一样。
+ */
+function subjectScore(game, subject, factor = 1) {
   const diff = rulesOf(game);
   const knowledge = clamp((game.knowledge[subject.key] ?? 0) / 100, 0, 1);
   const moodMod = examMoodFactor(game);
@@ -1944,7 +2261,8 @@ function subjectScore(game, subject) {
   const physiqueMod = clamp(0.96 + (game.stats.physique - 50) / 600, 0.88, 1.06);
   const noiseScale = clamp(1 - (game.mods.examNoise ?? 0), 0.3, 1);
   const noise = 1 + (nextFloat(game) - 0.5) * 2 * diff.examNoise * noiseScale;
-  const pct = clamp(knowledge * moodMod * fatigueMod * physiqueMod * noise, 0, 1);
+  const bet = clamp(Number(factor) || 1, 0.4, 1.6);
+  const pct = clamp(knowledge * moodMod * fatigueMod * physiqueMod * noise * bet, 0, 1);
   return Math.round(subject.max * pct);
 }
 
@@ -1960,10 +2278,14 @@ export function estimateExam(game) {
 }
 
 function runExam(game, item, result) {
+  // 考前押卷（v3.6）：在算分之前把赌注兑现，系数乘进 subjectScore。
+  // betRoll 只读 rngState，所以这一场之后的随机序列和不押时逐位相同。
+  const betOutcome = resolveExamBet(game, item);
+  const betFactor = (key) => betOutcome?.factors?.[key] ?? 1;
   const subjects = {};
   let total = 0;
   for (const subject of subjectsOf(game)) {
-    const value = subjectScore(game, subject);
+    const value = subjectScore(game, subject, betFactor(subject.key));
     subjects[subject.key] = value;
     total += value;
   }
@@ -1977,12 +2299,24 @@ function runExam(game, item, result) {
     rank,
     subjects,
   };
+  if (betOutcome) {
+    record.bet = {
+      mode: betOutcome.bet.mode,
+      modeName: betModeName(betOutcome.bet.mode),
+      subject: betOutcome.bet.subject,
+      subjectName: betOutcome.bet.subjectName,
+      hit: betOutcome.hit,
+      chance: betOutcome.bet.chance,
+      factor: betOutcome.hit ? hitFactor(betOutcome.bet.mode) : missFactor(betOutcome.bet.mode),
+    };
+  }
   game.exams.push(record);
   result.exams.push(record);
 
   const lines = result.lines;
   lines.push(`\n📝 ${item.name}：总分 ${total} / ${TOTAL_MAX}　年级第 ${rank} 名（同级 1000 人）`);
   lines.push(subjectsOf(game).map((subject) => `${subject.name} ${subjects[subject.key]}`).join('　'));
+  if (betOutcome) lines.push(...betOutcome.lines);
 
   if (item.kind === 'gaokao') {
     lines.push('考试结束的铃声响起。你走出考场，六月的马鞍山很热，天很蓝。');
@@ -2747,6 +3081,10 @@ function collectAchievements(game) {
   for (const item of CHAIN_ACHIEVEMENTS) {
     if (game.flags[item.flag]) add(item.icon, item.name, item.desc);
   }
+  // 考前押卷自带的成就（src/data/exam-bets.js 声明，同样按 flag 捡）
+  for (const item of BET_ACHIEVEMENTS) {
+    if (game.flags[item.flag]) add(item.icon, item.name, item.desc);
+  }
   // 一周日常事件自带的成就（events7.js）
   for (const item of DAILY_ACHIEVEMENTS) {
     if (game.flags[item.flag]) add(item.icon, item.name, item.desc);
@@ -2834,6 +3172,11 @@ export function runSummary(game) {
     /** v3.0：玩法与对战结果（单人模式是 null） */
     mode: game.mode ?? 'solo',
     versus,
+    /**
+     * v3.6 考前押卷：榜上必须分得清"押中三次的 700 分"和"从不押的 700 分"，
+     * 所以摘要里带上押了几场、中了几场（分数本身不变，分数就是分数）。
+     */
+    bets: view.examBet.summary,
   };
 }
 
@@ -2919,6 +3262,9 @@ export function deserialize(input) {
   data.volunteer = data.volunteer && typeof data.volunteer === 'object' ? data.volunteer : null;
   data.volunteerMode = data.volunteerMode !== false;
   data.chains = Array.isArray(data.chains) ? data.chains : [];
+  // 考前押卷（v3.6）：老存档没有这两个字段，补成"这一场还没押过"
+  data.examBet = sanitizeExamBet(data.examBet, data.subjectKeys);
+  data.examBets = sanitizeExamBets(data.examBets);
   data.flags ??= {};
   data.cooldowns ??= {};
   data.log ??= [];
@@ -3068,12 +3414,19 @@ export function viewState(game) {
       subjects: item.subjects,
       semesterIndex: item.semesterIndex,
       week: item.week,
+      /** 这一场押了什么（没押就是 null）——成绩条上的角标用它。 */
+      bet: item.bet ?? null,
     })),
     actions: listActions(game),
     /** 这一局实际写下了哪些"选择记忆"（v3.5）：前端存进档案，下一局开局继承用。 */
     earnedMemories: memoryIdsForFlags(game.flags),
     /** 本局开局继承了什么（没继承就是空数组）。 */
     inherited: game.inherit?.memoryIds ?? [],
+    /**
+     * 考前押卷（v3.6）：窗口、命中率、这一场押了什么、这一局押过的每一场。
+     * 押卷不需要单独的读接口——界面从每周的 view 里就能拿到全部信息。
+     */
+    examBet: examBetState(game),
     /**
      * 下回预告（v3.4）：每周结算给一句"往前看"的钩子，不改变任何数值。
      * 只吃一个快照，方便单独测（见 src/data/teasers.js）。
@@ -3400,6 +3753,15 @@ function applyKnowledgeDecay(game) {
    * 上限 1.6 / 下限 0.1，免得叠出"忘得只剩 0"或"越忘越多"的离谱数值。
    */
   const keep = clamp(1 - (game.mods.decay ?? 0), 0.1, 1.6);
+  /*
+   * 考前押卷（v3.6）押错之后的"还债"：那一科没覆盖的章节，两周内补起来格外费劲。
+   * 它只在 applyKnowledgeDecay 里生效，所以是"真的多掉知识"，
+   * 而不是日志里的一句旁白（测试会对比同一周押错与不押的衰减量）。
+   */
+  const backfire = game.flags?.betBackfire;
+  const backfireActive = Boolean(backfire && backfire.key && game.turn <= (backfire.untilTurn ?? 0));
+  if (backfire && !backfireActive) delete game.flags.betBackfire;
+  let backfireExtra = 0;
   const parts = [];
   let total = 0;
 
@@ -3414,6 +3776,11 @@ function applyKnowledgeDecay(game) {
     // 本来就低分的不容易继续掉，免得直接归零（也符合"弱科反而好提"的直觉）
     if (current < 60) amount *= rule.weakBonus;
     amount *= keep;
+    if (backfireActive && backfire.key === key) {
+      const extra = amount * ((backfire.mul ?? FOCUS_BACKFIRE_MUL) - 1);
+      amount += extra;
+      backfireExtra += extra;
+    }
 
     const next = Math.max(rule.floor, current - amount);
     const delta = next - current;
@@ -3427,7 +3794,12 @@ function applyKnowledgeDecay(game) {
   game.weekGain = {};
   game.weekendGain = 0;
 
-  return { total, parts, weekendStudied };
+  return {
+    total,
+    parts,
+    weekendStudied,
+    backfire: backfireActive ? { key: backfire.key, name: SUBJECT_MAP[backfire.key]?.name ?? backfire.key, extra: backfireExtra } : null,
+  };
 }
 
 function applyWeeklyUpkeep(game, lines) {
@@ -3461,6 +3833,13 @@ function applyWeeklyUpkeep(game, lines) {
     const more = decay.parts.length > 4 ? `　等 ${decay.parts.length} 科` : '';
     const nudge = decay.weekendStudied ? '' : '（周末没学，掉得更快）';
     lines.push(`📉 不进则退：${shown}${more}${nudge}`);
+  }
+  // 押错的"还债"单独说清楚是哪一科、为什么——不能只有一句"运气不好"
+  if (decay.backfire && decay.backfire.extra > 0.05) {
+    lines.push(
+      `📉 押掉的那一块在还债：${decay.backfire.name} 额外多掉 ${round1(decay.backfire.extra)}` +
+        `（考前没覆盖的章节，补起来格外费劲）`,
+    );
   }
 }
 

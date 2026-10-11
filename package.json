@@ -1,11 +1,10 @@
 {
   "name": "mas-2z-simulator",
   "productName": "中二野人实验室",
-  "version": "3.5.0",
-  "description": "中二野人实验室 —— 零依赖的 Node.js 高中生活模拟器（CLI + 网页 + Electron 桌面客户端 + 安卓 APK）",
+  "version": "3.6.0",
+  "description": "中二野人实验室 —— 零依赖的 Node.js 高中生活模拟器（CLI + 网页 + 安卓 APK）",
   "type": "module",
   "private": true,
-  "main": "electron/main.cjs",
   "bin": {
     "mas2z": "./src/cli.js"
   },
@@ -23,24 +22,19 @@
     "pages": "node tools/build-pages.mjs",
     "pages:shots": "python tools/build-pages-shots.py",
     "pages:serve": "node tools/serve-pages.mjs",
-    "desktop": "electron .",
-    "desktop:dev": "electron . --dev",
-    "desktop:selftest": "electron . --selftest",
-    "desktop:portable": "node tools/build-desktop.mjs",
-    "installer": "node tools/build-installer.mjs",
     "apk:sdk": "node tools/android-sdk.mjs",
     "apk": "node tools/build-apk.mjs",
-    "icons": "python tools/make-icon.py",
-    "dist": "electron-builder --win --x64",
-    "dist:dir": "electron-builder --dir"
+    "icons": "python tools/make-icon.py"
   },
   "keywords": [
     "simulator",
     "game",
     "nodejs",
     "cli",
-    "electron",
-    "desktop",
+    "web",
+    "pwa",
+    "android",
+    "apk",
     "roguelite",
     "maanshan",
     "二中"
@@ -48,68 +42,9 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "devDependencies": {
-    "electron": "^33.4.11",
-    "electron-builder": "^25.1.8"
-  },
   "author": {
     "name": "中二野人实验室",
     "email": "noreply@example.com"
-  },
-  "build": {
-    "appId": "com.mas2z.simulator",
-    "productName": "中二野人实验室",
-    "copyright": "MIT Licensed · 虚构作品，与任何真实学校无关",
-    "directories": {
-      "output": "dist/desktop",
-      "buildResources": "electron/assets"
-    },
-    "files": [
-      "electron/**/*",
-      "src/**/*",
-      "web/**/*",
-      "package.json",
-      "README.md"
-    ],
-    "win": {
-      "icon": "electron/assets/icon.ico",
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "artifactName": "中二野人实验室-${version}-安装版.${ext}",
-      "shortcutName": "中二野人实验室"
-    },
-    "portable": {
-      "artifactName": "中二野人实验室-${version}-便携版.${ext}"
-    },
-    "linux": {
-      "target": [
-        "AppImage"
-      ],
-      "category": "Game"
-    },
-    "mac": {
-      "target": [
-        "dmg"
-      ],
-      "category": "public.app-category.games"
-    }
   },
   "license": "MIT"
 }

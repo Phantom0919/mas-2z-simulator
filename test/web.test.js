@@ -344,3 +344,90 @@ test('再来一局必须关掉所有弹层并重绘开局表单（第二把玩�
   const renderBuildForm = /function renderBuildForm\(\)\s*\{([\s\S]*?)\n\}/.exec(app)?.[1] ?? '';
   assert.match(renderBuildForm, /updateBuildHint\(\)/, 'renderBuildForm 必须顺手刷新提示与按钮状态');
 });
+
+/* ------------------------------------------- 续玩钩子 / 上一次的你（v3.6） */
+
+test('续玩卡与结局对比的骨架静态写在 index.html 里（不能被 innerHTML 造出来）', async () => {
+  const html = await readWeb('index.html');
+  const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]));
+  const required = [
+    'resume-card',
+    'resume-title',
+    'resume-lines',
+    'btn-resume-run',
+    'btn-resume-fresh',
+    'btn-resume-gallery',
+    'ending-compare',
+    'ending-next',
+    'btn-ending-next',
+  ];
+  const missing = required.filter((id) => !ids.has(id));
+  assert.deepEqual(missing, [], `index.html 缺少续玩卡 / 结局对比的元素：${missing.join(', ')}`);
+});
+
+test('app.js 接好了续玩钩子与「上一次的你」（零新接口）', async () => {
+  const js = await readWeb('app.js');
+  assert.match(js, /mas2z-hook-v1/, '要有续玩钩子的 localStorage 键');
+  assert.match(js, /renderResumeCard/, '要渲染续玩卡');
+  assert.match(js, /buildHook\(state\.view\)/, 'persist() 每次进度变化都要覆写账本');
+  assert.match(js, /readHook\(/, '开屏要读账本');
+  assert.match(js, /selfCompare\(/, '结局页要跟上一次的自己比');
+  assert.match(js, /nearestUndiscovered\(/, '结局页要提示「差一点」');
+  assert.match(js, /leadToDraft\(/, '线索要能带进下一局的构筑');
+  // 探针可复现：?demo=60&seed=probe-1 必须真的把种子写回表单
+  assert.match(js, /params\.get\('seed'\)/, 'maybeAutoStart 要认 URL 上的 seed');
+  // 同难度对比的口径来自档案条目本身
+  assert.match(js, /difficulty: view\.difficulty\?\.key/, '档案条目要带上这一局的难度');
+  // 这一版刻意不加任何接口：续玩与对比全是本地数据
+  assert.ok(!/['"`]\/api\/(hook|recap|history)/.test(js), '续玩钩子 / 自我对比不该开新接口');
+
+  // 结局页那块对比：有数据要显示出来，没数据要藏起来（v3.6 踩过"填了内容但没摘 hidden"的坑）
+  const compare = /function renderEndingCompare\(ending\)\s*\{([\s\S]*?)\n\}/.exec(js)?.[1] ?? '';
+  assert.ok(compare.length > 0, '找不到 renderEndingCompare');
+  assert.match(compare, /classList\.remove\('hidden'\)/, '有对比数据时要把 #ending-compare 显示出来');
+  assert.match(compare, /classList\.add\('hidden'\)/, '没有可比的一局时要把 #ending-compare 藏起来');
+
+  // 钩子被消费后必须清掉，不能每次开屏都念同一句旧话
+  const dismiss = /function dismissResumeCard\(\)\s*\{([\s\S]*?)\n\}/.exec(js)?.[1] ?? '';
+  assert.match(dismiss, /clearHook\(\)/, '「重新捏一个人」要把续玩钩子消费掉');
+});
+
+test('web/recap.js 留在 web/ 下，并且被模块图收得到（挪走就不会进包）', async () => {
+  assert.ok(existsSync(join(root, 'web', 'recap.js')), 'web/recap.js 必须留在 web/ 下');
+  const { collectModules } = await import('../tools/module-graph.mjs');
+  const { modules } = collectModules({ root, entries: [join(root, 'web', 'app.js')] });
+  assert.ok(modules.includes('web/recap.js'), `模块图里没有 web/recap.js：${modules.join(', ')}`);
+});
+
+test('style.css 有续玩卡 / 对比块 / 回访开屏的样式，且不用 :has()', async () => {
+  const css = await readWeb('style.css');
+  for (const selector of [
+    '.resume-card',
+    '.resume-hook',
+    '.resume-actions',
+    '.mirror-strip',
+    '.near-list',
+    '.near-item',
+    '.returning .splash',
+  ]) {
+    assert.ok(css.includes(selector), `style.css 缺少 ${selector}`);
+  }
+  // 注释里可以讨论"为什么不用 :has()"，真正要盯的是选择器本身
+  const rules = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(!rules.includes(':has('), '老 WebView（minSdk 21）不支持 :has()，别用');
+});
+
+test('没有 CDN 依赖，也没有 blob:（CSP 只允许 self 与 data:）', async () => {
+  const html = await readWeb('index.html');
+  const css = await readWeb('style.css');
+  const js = await readWeb('app.js');
+  assert.ok(!/<script[^>]+src="https?:/.test(html), 'index.html 不许引外部脚本');
+  assert.ok(!/@import\s+url\(\s*['"]?https?:/.test(css), 'style.css 不许引外部样式');
+  for (const [name, content] of [
+    ['index.html', html],
+    ['style.css', css],
+    ['app.js', js],
+  ]) {
+    assert.ok(!content.includes('blob:'), `${name} 里不该出现 blob:（CSP 的 img-src 不认它）`);
+  }
+});

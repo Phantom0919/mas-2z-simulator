@@ -27,6 +27,7 @@ import {
   endingCatalog,
   performAction,
   pickNickname,
+  placeExamBet,
   randomStudentName,
   relationGraph,
   renderTreeText,
@@ -584,6 +585,23 @@ export function createGameServer({
         }
         const result = submitVolunteers(game, body.picks ?? [], { adjust: body.adjust !== false });
         sendJson(res, 200, { lines: result.lines, ending: result.ending, view: viewState(game) });
+        return;
+      }
+
+      /*
+       * 考前押卷（v3.6）：下注本身不推进时间、也不消耗随机数，
+       * 所以它是独立的一条路由（和 action / event 平级），而不是当成一个行动。
+       * 命中的骰子留到考试那一刻才掷——这里只记账。
+       */
+      if (pathname === '/api/exam-bet' && req.method === 'POST') {
+        const body = await readJsonBody(req);
+        const game = store.get(body.gameId);
+        if (!game) {
+          sendJson(res, 404, { error: '这局游戏已经过期了，请重新开始。' });
+          return;
+        }
+        const result = placeExamBet(game, { mode: body.mode, subject: body.subject });
+        sendJson(res, 200, { lines: result.lines, view: viewState(game) });
         return;
       }
 

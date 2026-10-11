@@ -53,6 +53,8 @@ const REQUIRED_MODULES = [
   'src/data/actions.js',
   'src/data/events.js',
   'src/data/events2.js',
+  // 考前押卷（v3.6）：引擎静态 import 它，漏了它网页/APK 都会白屏
+  'src/data/exam-bets.js',
   'src/data/names.js',
   'src/data/cast.js',
   'src/data/story.js',

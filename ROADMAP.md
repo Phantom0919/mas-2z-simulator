@@ -1,5 +1,33 @@
 # 发展建议 · ROADMAP
 
+> ### 🚩 最新状态（v3.6，本节由 Lead 维护；下面的"现状盘点"是写作当时的快照，保留不删）
+>
+> **平台口径变了**：本项目以后**只维护 安卓 APK + 网页版**。桌面 / Electron 客户端已下线
+> （源码、`tools/build-desktop.mjs`、`tools/build-installer.mjs`、`desktop/installer.nsi` 与那 19 条桌面测试都已移除）。
+> 理由：它只是把同一份前端塞进 Electron 壳，却要多养两条产物链（便携版 + NSIS 安装包，单份 78~110 MB），
+> 而这份零依赖代码在浏览器里本来就能完整跑。CLI 仍在仓库里（复用同一个引擎，测试也用），但**不作为发布目标**。
+>
+> **v3.6 落地**：考前押卷（新的局内决策类型）+ 续玩钩子账本（跨会话）+ 结局页「上一次的你 / 差一点」。
+> 设计依据是三份子智能体提案（局内机制 / 元进程 / 移动端体验），其中**已经做掉的**是：
+> 考前押卷（A 卷机制 A）、续玩钩子（C 卷候选 1）、结局页自我对比（C 卷候选 2）、`?seed=` 探针可复现（C 卷前置）。
+>
+> **还没做、但已经想清楚的（按性价比排）**：
+>
+> | # | 做什么 | 出处 | 工作量 | 为什么值得 / 关键约束 |
+> | --- | --- | --- | --- | --- |
+> | N1 | **人情账本**：好感度变成"会来讨债的债"，讨账走现成的 `chain`（`chainOnly`，概率挤不掉） | A 卷机制 B | L | 现在好感度只影响阈值成就/结局，是条"只涨不减"的单向路；内容量大，适合整块外包 |
+> | N2 | **押卷进内容包 + 排行榜口径**：`PACK_FORMAT` 1→2，榜上区分"押出来的分" | A 卷 §4 | M | `runSummary().bets`（押了几场/中了几场）已经写好，缺的是后端列与包格式迁移——建议与"因果链入包"合并成一次迁移 |
+> | N3 | **多周目深化：第二个三年 / 课桌刻痕** | B 卷机制 A、D | M | 课桌刻痕只要三行：`CHOICE_MEMORIES` 的 flag 顺带当计数器 + 走 `game.flags.scriptedEvent` 强制触发通道（**不用登记校历**）；"第二个三年"要把上一局班底带回新局，而 `createGame` 的 `buildCast({ overrides })` 只认 `{name, gender}` |
+> | N4 | **拇指坞 + 出分数字滚动 + Canvas 战报** | C 卷候选 3/4/5 | M | 拇指坞省掉一局 72 次滚动，但要给 `AndroidManifest.xml` 加 `VIBRATE`；Canvas 战报必须用 `data:` URL（CSP 不许 `blob:`），动态 import 不会被 `tools/module-graph.mjs` 收进包，要补守门测试 |
+> | N5 | **平衡校准**（老账）：卷王实测 608.8 仍够不到 985 线（636），低分策略缺"恢复类"抓手 | —— | M | **别把 `gainScale` 全局调高**——那是把所有策略一起抬。要么给低分策略恢复手段，要么动录取线 |
+> | N6 | **重拍三张官网截图**：志愿填报 / 内容包面板 / 推送横幅 | v3.6 遗留 | S | 现有素材是 v3.0 改名**之前**拍的，画面里写着旧产品名「马鞍山二中模拟器」；v3.6 已把另外 4 张换成当前界面，这 3 张需要先造出对应状态（志愿阶段存档 / 导入一个内容包 / 假更新清单）再截，所以暂时从官网撤下 |
+>
+> 三条仍然成立的教训（第 6.3 节写得更细，这里是 v3.6 复核过的版本）：
+> **跨文件接口必须先冻结再并行**（本次冻结 `viewState().examBet` + `POST /api/exam-bet`，
+> 前端队友在引擎落地前后各改一轮都没返工）；**引擎只能一个人改**；
+> **验收必须由不写实现的人独立做**——本次独立核验盯的是"服务端有、离线版没有"这类分叉复发，
+> 现在有一条测试同时钉住服务端、`web/local-api.js` 与 APK 打包清单。
+
 > 对象：中二野人实验室（`package.json` 3.1.0 / `engine.js` `GAME_VERSION` 3.1.0；v3.0 起由「马鞍山二中模拟器」改名）
 > 这份文档写于 v2.6 三件事（内容包热更新 / 高考志愿填报 / 因果链事件）正在同时落地的过程中。
 > 所有数字都是**当场实测**出来的，不是从 README 抄的。
@@ -71,15 +99,15 @@
 **接线 events6 之后会变成**：非剧情事件 108、选择事件 82、选项 225、`ALL_EVENTS` 144、成就 79。
 `calendar.js` 已经有一条红灯（`时间表里没有拼错的 id，也没有自相矛盾的窗口`）——21 个链事件还没有登记校历。
 
-### 1.2 技术栈与四端产物
+### 1.2 技术栈与三端产物
 
-零运行时依赖的纯 ESM Node.js；引擎 1 份，界面 4 份。`node -v` = **v20.18.0**。
+零运行时依赖的纯 ESM Node.js；引擎 1 份，界面 3 份（桌面版后来**已下线，不再维护**，见下表的留痕）。`node -v` = **v20.18.0**。
 
 | 端 | 入口 | 规模 | 产物 / 现状 |
 | --- | --- | --- | --- |
 | CLI | `src/cli.js` | 898 行 | `bin: mas2z`；`--auto` 9 策略、`--gallery`、`--json`、`--endless` |
 | 网页 | `src/server.js` 403 行 + `web/` 4,478 行 | `app.js` 1,841 / `style.css` 2,134 / `index.html` 314 | `npm run web`，静态文件 + JSON API + 内存会话 |
-| Electron | `electron/main.cjs` 350 行 + preload/menu/window-state | 内嵌 `src/server.js` 随机端口 | 便携 zip 110 MB、NSIS 安装版 78 MB（`dist/desktop` 共 457 MB） |
+| ~~Electron~~（**已下线，不再维护**） | 原 `electron/main.cjs` 350 行 + preload/menu/window-state | 原为内嵌 `src/server.js` 随机端口 | 原产物：便携 zip 110 MB、NSIS 安装版 78 MB（`dist/desktop` 共 457 MB）；源码 / 打包脚本 / 安装包模板 / 那 19 条测试已从仓库移除，历史版本留在 git 历史与旧 release 里 |
 | 安卓 | `android/.../MainActivity.java` 134 行 + `web/local-api.js` 189 行 | APK 367 KB | `android-sdk` **394 MB 在项目目录里**（已 gitignore）；`dist/` 里躺着 2.4.0 与 2.5.0 两个 APK |
 
 引擎 `src/engine.js` 现在 **2,941 行**（本会话内从 2,361 涨上来），导出 70 个符号，同时装着回合、考试、NPC、商店、结局、内容包、志愿填报、因果链——单文件是当前最大的结构性风险（见 4.5）。
@@ -91,7 +119,7 @@
 
 | 文件 | 测试数 | 文件 | 测试数 |
 | --- | --- | --- | --- |
-| `engine.test.js` | 33 | `electron.test.js` | 24 |
+| `engine.test.js` | 33 | ~~`electron.test.js`~~ | —（**已下线**，随桌面版一并删除） |
 | `cast.test.js` | 43 | `web.test.js` | 21 |
 | `calendar.test.js` | 17 | `android.test.js` | 19 |
 | `custom.test.js` | 30 | `server.test.js` | 15 |
@@ -112,7 +140,7 @@
 2. **安卓是第二套接口实现**：`local-api.js` 只有 13 条路由，和服务端**已经分叉**；快照期红灯 `离线接口：可以一路打到结局` 就是这个分叉的直接后果。
 3. **CLI 走不到新结局**：`runInteractive` 是 `while (game.status === 'playing')`，末尾只 `if (game.status === 'ended') renderEnding(game)`；交互模式打到高考出分后会**静默停在 `volunteering`**，既不提示也不能填志愿。
 4. **版本号五处漂移**：`package.json` 2.5.0、`engine.js` `GAME_VERSION` 2.6.0、README 标题 v2.5、CHANGELOG 最新条 v2.5.0、`dist/` 里 APK 是 2.4.0 与 2.5.0。`engine.js` 第 101 行写着"和 package.json 必须一致（有测试盯着）"——**`test/` 里没有任何测试引用 `GAME_VERSION`**，这句承诺是空的。
-5. **内容包只活在内存里**：`applyContentPack` 改的是 `activePack` 变量，进程一退就回到官方内容；网页刷新、APK 重启、桌面重开都会丢。
+5. **内容包只活在内存里**：`applyContentPack` 改的是 `activePack` 变量，进程一退就回到官方内容；网页刷新、APK 重启、进程重开都会丢。
 6. **项目不是 git 仓库**：`git status` → `not a git repository`，而工作区里有 394 MB SDK + 457 MB 产物 + 正在被多人同时改的引擎，一次误改没有回滚点。
 
 ---
@@ -124,7 +152,7 @@
 | # | 做什么（为什么值得） | P | 工作量 | 影响面 | 验收标准 |
 | --- | --- | --- | --- | --- | --- |
 | **S1** | **四端收口**：补 `server.js` 缺的 4 条 `/api/content*` 与 `/api/volunteer`；在 `local-api.js` 补同样 5 条；把 CLI 交互循环从 `while (playing)` 改成能处理 `volunteering`（出分后打印成绩、让玩家用数字选 6 个志愿、提交后进结局）。**不修的话，本次三件事只在一种部署形态下成立** | **P0** | **M** | `src/server.js`、`web/local-api.js`、`src/cli.js`、`test/{server,web,android,engine}.test.js` | `node --test test/` 全绿（含"离线接口能一路打到结局"）；`curl -s localhost:3210/api/content` 返回 `source: "official"`；CLI 手打一局能在终端填 6 个志愿并打印"第 N 志愿录取" |
-| **S2** | **内容包持久化 + 一键回滚**：把生效的包存进 localStorage（网页/安卓）、`saves/content-pack.json`（CLI/Electron），启动时自动重放；`contentStatus()` 补 `appliedAt`；"恢复官方内容"接上已有的 `resetContent()` | **P1** | **M** | `src/content.js`、`src/engine.js`、`web/app.js`、`web/local-api.js`、`src/server.js` | 网页导入一个包→刷新页面→面板仍显示同一个校验和与 `eventCount`；点重置后 `eventCount` 回到 87（接线后 108） |
+| **S2** | **内容包持久化 + 一键回滚**：把生效的包存进 localStorage（网页/安卓）、`saves/content-pack.json`（CLI），启动时自动重放；`contentStatus()` 补 `appliedAt`；"恢复官方内容"接上已有的 `resetContent()` | **P1** | **M** | `src/content.js`、`src/engine.js`、`web/app.js`、`web/local-api.js`、`src/server.js` | 网页导入一个包→刷新页面→面板仍显示同一个校验和与 `eventCount`；点重置后 `eventCount` 回到 87（接线后 108） |
 | **S3** | **版本号单一真源 + 发版守门**：`package.json` 定为唯一真源，`engine.js` 从它读或加断言；新增 `test/version.test.js` 同时盯 `GAME_VERSION`、README 首行、CHANGELOG 首条、`AndroidManifest.versionName`（后者已有测试）、`dist/` 产物名 | **P0** | **S** | `package.json`、`src/engine.js`、`test/version.test.js`、`README.md`、`CHANGELOG.md` | 故意把 `package.json` 改成 `9.9.9`，`node --test test/` 至少 3 条红；改回后全绿 |
 | **S4** | **接线 events6 + 登记校历 + 泛化自检工具**：把 `engine.js` 第 69–70、119 行三处注释换成真实 import；给 21 个链事件补 `calendar.js` 条目；`tools/check-events5.mjs` 泛化成 `check-content.mjs`，接受任意事件文件或 `content pack` | **P0** | **M** | `src/engine.js`、`src/data/calendar.js`、`src/data/events6.js`、`tools/check-content.mjs`、`test/calendar.test.js` | 那条校历红灯转绿；`ALL_EVENTS` 从 123 变 144；`node tools/check-content.mjs src/data/events6.js` 把每个选项丢进真实引擎跑通、0 报错 |
 | **S5** | **内容包拉取的安全边界**：`app.js` 已有"从地址拉取内容包"；服务端若照做就是 SSRF（本机端口/LAN 设备）+ 无大小上限。做法：只允许 `https:`、拒私网与回环、body ≤1 MB、`JSON.parse` 后深度与数组长度上限 | **P0** | **S** | `src/server.js`、`web/app.js` | 一条测试对 `/api/content/apply` 传 `{"url":"http://127.0.0.1:22/"}` 得到 400，且不发生任何外连 |
@@ -157,7 +185,7 @@
 | # | 做什么（为什么值得） | P | 工作量 | 影响面 | 验收标准 |
 | --- | --- | --- | --- | --- | --- |
 | **L1** | **同种子对跑 / 异步"同学会"**：不引服务器，用"种子 + 构筑"作为交换单元，两人各跑三年后对比知识/关系/心情曲线；`rng.js` 的 splitmix32 可序列化，这是现成的地基 | **P2** | **L** | `src/rng.js`、`src/engine.js`、`src/cli.js`、`web/app.js` | 两端加载同种子同构筑，36 周后 `game.knowledge` 逐科完全相等；对跑报告能并排显示两人曲线 |
-| **L2** | **跨平台同步（无账号版）**：零依赖是卖点，别做账号体系。把存档文件当同步单元——桌面 `saves/` 指到 OneDrive/坚果云目录，安卓经 SAF 读写同一份；元进度合并取并集 | **P2** | **L** | `src/profile.js`、`android/.../MainActivity.java`、`electron/main.cjs` | 桌面端把存档目录指到共享目录后，安卓导入同一存档能续玩到同一周；两端图鉴合并后解锁数 = 并集 |
+| **L2** | **跨平台同步（无账号版）**：零依赖是卖点，别做账号体系。把存档文件当同步单元——CLI / 网页导出的存档放进 OneDrive/坚果云目录，安卓经 SAF 读写同一份；元进度合并取并集。（原设计里的桌面端**已下线，不再维护**，`electron/main.cjs` 那条路已不存在） | **P2** | **L** | `src/profile.js`、`android/.../MainActivity.java` | 把存档放进共享目录后，安卓导入同一存档能续玩到同一周；两端图鉴合并后解锁数 = 并集 |
 | **L3** | **模板化 / 本地小模型事件生成 + 人工过审流水线**：关键不是生成而是**过审流水线**——候选事件必须过 `validatePack`、必须登记 `calendar.js`、必须能被真实引擎跑完每个选项，工具自动淘汰不合格的，人只审剩下的 | **P2** | **L** | `tools/`、`src/content.js`、`src/data/calendar.js` | 生成 50 个候选：未登记校历/占位符缺失的 100% 被工具淘汰；人工审完可一键导出成 `content pack` 并成功导入 |
 | **L4** | **UGC 分发（静态索引版）**：用 GitHub Release / 静态 JSON 索引做"内容包市场"，客户端内置索引地址 + 校验和校验（`checksumPack` 已有） | **P2** | **M** | `src/content.js`、`web/app.js`、`tools/` | 客户端从索引安装一个包，安装后本地校验和与索引一致；把包内容改一个字节后拒绝安装 |
 | **L5** | **引擎拆分（架构）**：`engine.js` 已 2,941 行、70 个导出，装着所有规则与目录。按 回合/考试/NPC/结局/内容包 拆成 `src/engine/*.js`，`exports` 入口与导出符号集合保持不变 | **P2** | **L** | `src/engine.js` → `src/engine/`、`package.json`、全部测试 | 拆分后 `node --test test/` 全绿，且一条新测试断言"引擎入口的 70 个导出名不变"（防止对外契约走形） |
@@ -170,7 +198,7 @@
 | --- | --- | --- | --- | --- | --- |
 | **R1** | **内容越多越难平衡** | 非剧情事件 69 → 87 → 108（+21 链事件）；README 自己记着"卷王 985+ 从 25% 掉到 4%"。事件池变大是**摊薄**，不是加法 | 把 `tools/sim.js` 报告纳入发版门（M6）；任何人加内容必须同时交前后对比，禁止"只加内容不跑 sim" | **P1 / M** | 一次"只加 10 个事件、不动平衡"的提交会因 sim 报告偏离阈值而变红，作者必须显式调旋钮才能过 |
 | **R2** | **热更新 = 作弊 + 版本碎片** | 包可覆写 23 个 `EFF` 键，把 `gainScale` 拉到 10 倍就是作弊；玩家 A 装包、B 不装，"同种子同结果"（README 明确承诺过）被打破 | 取舍是**不禁止**：图鉴/成就标注"本局装了非官方包"，存档记录包的 checksum（`contentStatus()` 已有），排行榜类功能只认官方校验和 | **P1 / S** | 装了非官方包的一局，其 `runSummary()` 与图鉴条目都带包名 + checksum 标记 |
-| **R3** | **APK / EXE 无签名分发** | `dist/` 里是 debug 签名（`android/debug.keystore`，口令 `android`）；Windows 首启 SmartScreen 警告 | 发版必须附 SHA-256 校验和；把 keystore 换成不与仓库同口令的本地密钥；正式上架才考虑买证书（个人项目可以不买，但要在下载页写明） | **P1 / S** | 每个产物旁边有 `.sha256`，且 `dist/` 里的 APK 不再用口令为 `android` 的密钥签名 |
+| **R3** | **APK 无签名分发**（原为「APK / EXE 无签名分发」，其中 EXE 那条随桌面版**已下线**而不再适用） | `dist/` 里是 debug 签名（`android/debug.keystore`，口令 `android`）；安卓侧载会提示"未知来源应用" | 发版必须附 SHA-256 校验和；把 keystore 换成不与仓库同口令的本地密钥；正式上架才考虑买证书（个人项目可以不买，但要在下载页写明） | **P1 / S** | 每个产物旁边有 `.sha256`，且 `dist/` 里的 APK 不再用口令为 `android` 的密钥签名 |
 | **R4** | **单人开发的时间预算 + 无回滚点** | `git status` → `not a git repository`；工作区 394 MB SDK + 457 MB 产物；同时有 5 个角色在改同一个引擎 | **先 `git init` 再写下一行代码**：`.gitignore` 已经写好（含 `.android-sdk/`、`dist/`、`build/`、`android/debug.keystore`），每版打 tag。这条是所有其它建议的前提 | **P0 / S** | `git log` 能看到 v2.5.0 tag，`git status` 干净，SDK 与产物不在索引里 |
 | **R5** | **端数越多验证越贵，且接口已经分叉** | 服务端 14 条路由 vs `local-api.js` 13 条；"网页有、安卓没有"已实际发生两次（内容包、志愿），红灯 `离线接口：可以一路打到结局` 就是证据 | 路由表抽成共享清单，加一条测试断言"服务端有的路由，`local-api.js` 必须也有"（S1 的验收就是它）；发版前必须真机或解包验证，不能只看网页 | **P0 / S** | 故意只在服务端加一条路由，`node --test test/` 立刻红并指出缺哪条 |
 | **R6** | **长文本内容的质量与一致性** | 36 章剧情 + 108 事件靠人写，占位符漏一个就串戏（现在只有 `cast.test.js` 防漏） | `tools/check-content.mjs`（S4）作为提交前钩子：占位符、日历登记、每个选项真实引擎跑通，三关不过不许提 | **P1 / S** | 故意在事件文案里写一个不存在的 `{teacher}` 占位符，自检工具非零退出并指出文件与事件 id |

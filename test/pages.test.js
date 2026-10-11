@@ -144,6 +144,8 @@ test('在线试玩副本与 web/ 逐字节一致（玩家不该玩到旧版本�
     'app.js',
     'local-api.js',
     'relations-view.js',
+    // v3.6：续玩钩子账本是 app.js 静态 import 的新模块，漏拷进试玩副本就是"点了没反应"
+    'recap.js',
     'style.css',
     'manifest.webmanifest',
     'icons/icon-192.png',
@@ -263,7 +265,7 @@ test('docs/ 里有 .nojekyll，Pages 才不会拿 Jekyll 去处理这些文件',
 test('页面素材体积在预算内（手机流量党友好）', () => {
   const html = readDocs('index.html');
   const shots = [...new Set([...html.matchAll(/src="\.\/(assets\/shots\/[^"]+)"/g)].map((match) => match[1]))];
-  assert.equal(shots.length, 7, `截图应该有 7 张，实际 ${shots.length} 张`);
+  assert.equal(shots.length, 6, `截图应该有 6 张，实际 ${shots.length} 张`);
 
   let total = 0;
   for (const shot of shots) {
@@ -297,7 +299,7 @@ test('官网上引用的每张图都必须真的会被提交（不是被 .gitign
       ...[...html.matchAll(/href="\.\/([^"]+\.(?:png|ico|svg))"/g)].map((match) => match[1]),
     ]),
   ];
-  assert.ok(referenced.length >= 8, `页面引用的图太少（${referenced.length}），正则大概没匹配上`);
+  assert.ok(referenced.length >= 6, `页面引用的图太少（${referenced.length}），正则大概没匹配上`);
 
   const missing = referenced.filter((relative) => !existsSync(join(docsDir, ...relative.split('/'))));
   assert.deepEqual(missing, [], `这些图本地就不存在：${missing.join('、')}`);
@@ -545,7 +547,7 @@ test('点截图会放大、Esc 会关掉、复制按钮复制的是频道链接'
     await tick();
     await tick();
 
-    assert.equal(browser.shotButtons.length, 7, 'index.html 里的截图数量变了');
+    assert.equal(browser.shotButtons.length, 6, 'index.html 里的截图数量变了');
     const lightbox = browser.byId.get('lightbox');
     assert.equal(lightbox.hidden, true, '放大层初始应该是隐藏的');
 

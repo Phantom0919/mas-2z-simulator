@@ -299,8 +299,7 @@ button.big {
 /*
  * 链接当按钮用。
  *
- * 「加入腾讯频道」必须是 <a>：浏览器里要能新开标签页、桌面端要能交给系统浏览器
- * （electron/main.cjs 的 will-navigate / setWindowOpenHandler 会接住），
+ * 「加入腾讯频道」必须是 <a>：浏览器里要能新开标签页 / 交给系统浏览器自己接管，
  * 安卓端要能跳出 WebView 交给 QQ 或浏览器（MainActivity 的 shouldOverrideUrlLoading）。
  * 但外观得和旁边的按钮一模一样，所以这里把 button.primary / button.ghost / button.big
  * 的样式镜像过来——只镜像这三条，别把整个 button 选择器搬过来。
@@ -1068,6 +1067,9 @@ a.big {
 .exam-row {
   display: flex;
   justify-content: space-between;
+  /* 押卷角标（v3.6）在窄栏里会挤出去，所以允许换行；名字那一列不许被压扁 */
+  flex-wrap: wrap;
+  gap: 2px 6px;
   padding: 5px 0;
   border-bottom: 1px dashed var(--line);
 }
@@ -3238,6 +3240,396 @@ button,
   .board-position {
     flex: 0 0 26px;
   }
+}
+
+/* ------------------------------------------------- 续玩钩子账本（v3.6）
+ * 开局屏最上面那张卡：先把"上次停在哪儿"念一遍，再给一个拇指够得到的大按钮。
+ *
+ * 刻意不加任何动画、也不用 :has()——它是账本，不是弹窗；而且要照顾
+ * minSdkVersion 21 那批可能跑着 WebView <105 的机器（`:has()` 在那上面直接失效）。
+ * 预告那一行的四档语气直接复用 .teaser-exam / .teaser-danger / .teaser-story，
+ * 不另起一套配色。
+ */
+.resume-card {
+  margin: 4px 0 14px;
+  padding: 12px 12px 4px;
+  border: 1px solid rgba(63, 185, 80, 0.42);
+  border-radius: 12px;
+  background: rgba(63, 185, 80, 0.08);
+}
+
+.resume-title {
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.resume-lines {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+/* 预告原文：逐字来自引擎，所以这里只做"引用块"的观感，不改一个字 */
+.resume-hook {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.resume-hook-icon {
+  flex: none;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.resume-hook-lead {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  opacity: 0.62;
+}
+
+.resume-meta {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.resume-note {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+/* 卡片里的按钮：手机上拇指够得到（比 .start-actions 默认再高一点） */
+.resume-actions {
+  margin: 10px 0 10px;
+}
+
+.resume-actions button {
+  min-height: 46px;
+  flex: 1 1 auto;
+}
+
+/* ---------------------------------------- 上一次的你 / 差一点（v3.6）
+ * 结局页的两块：一块跟"上一次的自己"比，一块说"离下一个结局差什么"。
+ * 全程陈述句，不做评判（红线见 web/recap.js 的注释与 test/recap.test.js）。
+ */
+.mirror-strip {
+  margin: 12px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(140, 150, 255, 0.42);
+  border-radius: 10px;
+  background: rgba(140, 150, 255, 0.08);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.mirror-head {
+  font-weight: 700;
+}
+
+.mirror-line {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.mirror-best {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.near-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.near-head {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.near-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.near-lock {
+  flex: none;
+}
+
+.near-title {
+  font-weight: 600;
+}
+
+.near-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* 回访：老玩家不用再看一遍校徽呼吸（1.75s → 0.55s）。
+ * prefers-reduced-motion 那条仍然优先（它在文件末尾，且把动画压到 0.01ms）。 */
+.returning .splash {
+  animation: splash-out 0.25s ease-in 0.55s forwards;
+}
+
+/* ------------------------------------------------- 考前押卷（v3.6）
+ * 考前一星期出现在行动区上方的一张卡。语气上刻意不抢行动卡的风头：
+ * 边框是中性灰，只有"命中/押错"的角标用 --brand / --bad 说话。
+ * 不用 :has()（minSdkVersion 21 的机器可能跑着 WebView <105），按钮一律 ≥44px。
+ */
+.exam-bet-card {
+  margin: 0 0 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, rgba(47, 129, 247, 0.07), rgba(47, 129, 247, 0.02));
+}
+
+.exam-bet-card.hidden {
+  display: none;
+}
+
+.exam-bet-head {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+
+.exam-bet-icon {
+  flex: none;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.exam-bet-title {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.exam-bet-when {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.exam-bet-desc {
+  margin: 8px 0 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.exam-bet-options {
+  display: grid;
+  gap: 8px;
+}
+
+.exam-bet-options.hidden,
+.exam-bet-subject.hidden,
+.exam-bet-placed.hidden {
+  display: none;
+}
+
+/* 四个档位：整块可点，手机上拇指够得到（≥44px，实际更高） */
+.exam-bet-option {
+  display: grid;
+  gap: 4px;
+  min-height: 44px;
+  padding: 9px 11px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.exam-bet-option:hover:not(:disabled) {
+  border-color: var(--brand-2);
+}
+
+.exam-bet-option:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.exam-bet-option-head {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.exam-bet-option-name {
+  font-weight: 600;
+}
+
+.exam-bet-chance {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * 押卷卡只在"考前一周内"出现，但一局会出现十几次，所以描述夹到两行、
+ * 风险与收益并成一行——四个档位加起来别把行动卡整个推到折叠线以下
+ * （手机上必须先看到"这一周做什么"，押卷是决策点不是拦路虎）。
+ */
+.exam-bet-option-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.exam-bet-option-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.exam-bet-risk {
+  color: var(--warn);
+}
+
+.exam-bet-gain {
+  color: var(--brand);
+}
+
+/* 押重点展开的科目选择（在四个档位上面，展开就在视野里，不需要滚动） */
+.exam-bet-subject-wrap {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 10px;
+}
+
+.exam-bet-subject {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.exam-bet-subject-hint {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.exam-bet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.exam-bet-chip:hover:not(:disabled) {
+  border-color: var(--brand-2);
+}
+
+.exam-bet-chip.on {
+  border-color: var(--brand-2);
+  box-shadow: inset 0 0 0 1px rgba(47, 129, 247, 0.55);
+}
+
+.exam-bet-chip.weak {
+  border-color: rgba(210, 153, 34, 0.55);
+}
+
+.exam-bet-weak {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(210, 153, 34, 0.16);
+  color: var(--warn);
+  font-size: 11px;
+}
+
+/* 已经押过 / 历史角标 */
+.exam-bet-placed {
+  margin-top: 8px;
+  padding: 9px 11px;
+  border: 1px solid rgba(63, 185, 80, 0.42);
+  border-radius: var(--radius-sm);
+  background: rgba(63, 185, 80, 0.08);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.exam-bet-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.exam-bet-history:empty {
+  display: none;
+}
+
+/* 成绩单上的角标复用 .exam-bet-chip，但那里是只读的，所以不许撑到 44px */
+.exam-row .exam-bet-chip {
+  min-height: 0;
+  padding: 1px 8px;
+  margin-left: 6px;
+  font-size: 11px;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.exam-bet-chip.hit {
+  border-color: rgba(63, 185, 80, 0.5);
+  color: var(--brand);
+}
+
+.exam-bet-chip.miss {
+  border-color: rgba(248, 81, 73, 0.5);
+  color: var(--bad);
+}
+
+.exam-bet-chip.plain {
+  color: var(--muted);
 }
 
 /* ---------- 减弱动态效果 ---------- */

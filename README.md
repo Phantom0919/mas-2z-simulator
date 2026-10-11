@@ -1,12 +1,22 @@
-# 中二野人实验室 · v3.5
+# 中二野人实验室 · v3.6
 
 一个**零依赖的 Node.js 高中生活模拟器**（原名「马鞍山二中模拟器」，v3.0 起改名——
 搜不到校名，但"中二"两个字摆在那儿，玩的人一眼知道写的是哪所学校；
 游戏内的校名一律只写「二中」，与任何真实学校无关）。你是二中的高一新生，三年、六个学期、36 个星期，
 每个星期要在一堆选择里活下来：主行动 + 周末安排，一共 **72 次决策**；高考之后还有最后一关——**填志愿**。
 
-同时提供 **终端版（CLI）**、**网页版（Web UI）**、**桌面客户端**和**安卓 APK**，共用同一份纯逻辑引擎。
+同时提供 **终端版（CLI）**、**网页版（Web UI）**和**安卓 APK**，共用同一份纯逻辑引擎。
 `docs/` 目录是一个可以直接扔到 GitHub Pages 的**官方发布页**：在线试玩 + 一键下载 + 交流频道入口。
+
+## 平台支持：只有 安卓 APK + 网页版
+
+本项目只维护**两个交付目标**：**安卓 APK** 和**网页版**（含可安装的 PWA）。
+**桌面 / Electron 客户端已下线，不再维护**（源码、便携版打包脚本、NSIS 安装包脚本与那 19 条桌面测试都已从仓库移除）。
+
+理由是诚实的：桌面版并没有提供网页版给不了的东西——它只是把同一份前端塞进一个 Electron 壳里，
+却要额外维护主进程 / 菜单 / 窗口状态、NSIS 安装包与便携版打包两条产物链，单份发布体积从 0.5 MB 涨到 78~110 MB；
+而这份**零依赖**代码在浏览器里本来就能完整跑（CLI 用的也是同一个引擎）。维护成本远大于收益，所以砍掉。
+历史版本（包含 exe / zip 产物与当年那份 Electron 源码）仍可在 git 历史与旧 release 里找到。
 
 > 🎮 玩法与数值变化见 [CHANGELOG.md](./CHANGELOG.md)。
 > 🗺️ 下一步做什么、以及这个项目是怎么分工的，见 [ROADMAP.md](./ROADMAP.md)。
@@ -14,6 +24,18 @@
 > 游戏里的校名一律只写「二中」，不对应任何一所真实中学。
 
 ---
+
+## v3.6 新增了什么
+
+| 系统 | 内容 |
+| --- | --- |
+| 🎲 **考前押卷（新玩法）** | 考前一星期可以下注：🔪 押重点（砍范围，命中那一科 ×1.25 / 押错 ×0.72 且两周内补起来更费劲）、🎲 押题（五五开，命中全科 ×1.16 / 押错 ×0.86 + 疲劳）、🛌 考前睡够（不赌分数，养状态）、🙅 不押。命中率由**综合素质**与"这是不是你的弱科"决定，按钮上直接写出来 |
+| ⚖️ **不是免费加分** | 四档的期望系数都钉在 1 附近（有测试），押重点在偏科局更强、考前睡够在状态快崩时更强；押错真的会掉分 + 掉知识，不是一句旁白 |
+| 🎲 **不碰随机流** | 命中判定 `betRoll()` 只读 `rngState`：同种子下押与不押的随机序列、未押科目分数逐位相同（"同种子同结果"的老承诺没破） |
+| 🎫 **成绩条留痕** | 每场考试记 `record.bet`（押了什么/中没中/×多少），成绩列表有角标；`runSummary().bets` 进一局摘要，榜单能区分"押出来的分"和"考出来的分" |
+| 📱 **续玩钩子账本** | 每周的"下回预告"存到本机，下次打开先念一遍 + 一键回到第 N 周（跨会话才算钩子） |
+| 📉 **结局页的"上一次的你"** | 同难度自我对比 + "差一点"提示；没有上一局档案时不显示（不显示 0） |
+| 🔢 **6 个新成就** | 🔪 押中重点 / 🩹 押掉的那一科 / 🎲 赌对方向 / 💸 白熬一周 / 🛌 考前睡够的人 / 🧨 每场都赌 |
 
 ## v3.5 新增了什么
 
@@ -66,7 +88,7 @@
 | 📊 **同榜竞争** | 每次考试往日志塞一条对比；侧栏常驻「⚔️ 对战」面板；结局页一张对战卡片（双方结局 + 战绩 + 胜负） |
 | 🔒 **不影响单人模式** | 有测试逐条断言：同种子的单人局和对战局，玩家的随机流 / 属性 / 知识 / 回合数完全一致；AI 不作弊也不改你的数值 |
 | 🧮 **没高考分也能比** | 保送 / 强基 / 退学这类结局按档次折算"等效分"（好结局 700 / 坏结局 380），并标注"等效判定" |
-| 🐛 **顺手修掉** | 网页 / APK 端原来关不掉志愿填报（`/api/new` 不认 `volunteers`）；桌面成品检查不再被历史产物带红 |
+| 🐛 **顺手修掉** | 网页 / APK 端原来关不掉志愿填报（`/api/new` 不认 `volunteers`）；成品包检查不再被历史产物带红 |
 
 ## v2.9 新增了什么
 
@@ -154,7 +176,7 @@ cd mas-2z-simulator
 
 npm start            # 终端版：进入开局向导（选科 / 天赋 / 背景 / 目标）
 npm run web          # 网页版：http://127.0.0.1:3210
-npm test             # 跑测试（引擎 + 服务端 + 前端 + 发布页，407 条）
+npm test             # 跑测试（引擎 + 服务端 + 前端 + 发布页，442 条）
 npm run sim          # 数值平衡报告（9 种策略批量跑）
 npm run gallery      # 查看结局图鉴与历史战绩
 npm run pages        # 生成 / 更新官方发布页（docs/）
@@ -213,7 +235,7 @@ node src/server.js --port 8080
 **📜 七条剧情线的进度与回顾**、**📋 高考志愿填报界面**、**🔄 内容包（热更新）面板**、
 **💬 交流 / 关于面板**（v2.9：一键进腾讯频道、复制频道链接、把成绩分享出去、赞助商），
 结局图鉴（存在浏览器 localStorage），并支持存档导出 / 导入。
-手机 APK 里是这个界面的同一份代码，所以三端（网页 / 桌面 / 安卓）看到的东西完全一样。
+手机 APK 里是这个界面的同一份代码，所以两端（网页 / 安卓）看到的东西完全一样。
 
 ### 官方发布页（GitHub Pages，v2.8）
 
@@ -319,10 +341,10 @@ node tools/check-leaderboard.mjs
 | --- | --- | --- |
 | 📱 手机 / 网页 | 顶栏「🔄 内容包」→ 选 JSON 文件 / 粘贴 JSON / 填 https 地址 → 应用（安卓 APK 和网页版是同一套界面） | 玩家 |
 | 💻 CLI | `node src/cli.js --pack 包.json`（`--pack` 不给值则读 `saves/content-pack.json`）；`--content` 看当前状态 | 调试 / 做对照实验 |
-| 🌐 服务端 / 桌面版 | `POST /api/content/apply`，body 传 `{ text }` / `{ url }` / `{ pack }`；`GET /api/content` 查状态、`POST /api/content/reset` 回官方。服务端会落盘到 `saves/content-pack.json`，重启自动重放 | 联网分发 / 自动化 |
+| 🌐 服务端版 | `POST /api/content/apply`，body 传 `{ text }` / `{ url }` / `{ pack }`；`GET /api/content` 查状态、`POST /api/content/reset` 回官方。服务端会落盘到 `saves/content-pack.json`，重启自动重放 | 联网分发 / 自动化 |
 
 - 装完界面会报**包名 / 版本 / 校验和 / 改动条数**，并**立刻生效**——不用重开一局，下一个事件就可能撞上新内容。
-- 网页版把包存在 localStorage，刷新页面自动重放；服务端 / 桌面版落盘在 `saves/content-pack.json`。
+- 网页版把包存在 localStorage，刷新页面自动重放；服务端版落盘在 `saves/content-pack.json`。
 - 手写 JSON 的常见坑会自动兜住并点名：**UTF-8 BOM**（记事本"另存为 UTF-8"就会带上）、零宽字符、中文标点 `“”，：`、尾随逗号、`//` 注释。
 - 校验不通过就**整包拒装**，不会把游戏留在"改了一半"的状态。
 
@@ -400,53 +422,12 @@ node src/cli.js --check-update web/content/update-manifest.json      # 本地清
 - 地址准入：只允许 https，或回环 / 内网的 http；`file:` / `data:` / `169.254.169.254`（云元数据端点）一律拒绝
 - 拉不到、清单坏了 = **什么都不做**：横幅不弹、报错不弹，游戏该玩玩（`unreachable` 和 `invalid` 在界面上也是两句话）
 
-### 桌面客户端（Electron）
+### 桌面客户端：已下线
 
-```bash
-npm install            # 只装 Electron（CLI / 网页版 / 测试都不需要它）
-# GitHub 被墙时用镜像装：$env:ELECTRON_MIRROR='https://registry.npmmirror.com/-/binary/electron/'; npm install electron
-
-npm run desktop        # 启动桌面客户端
-npm run desktop:dev    # 带开发者工具、菜单里多一个"打开存档目录"
-npm run desktop:selftest   # 自检：自动跑一遍界面与接口，输出 JSON 后退出（CI 友好）
-
-npm run desktop:portable   # 打 Windows 便携版：dist/desktop/…-win-x64.zip（约 110 MB，解压即用）
-npm run installer          # ⭐ 打 Windows 安装包：dist/desktop/…-安装版.exe（约 78 MB，NSIS）
-npm run dist               # electron-builder 的完整流程（可选，依赖 GitHub 下载 NSIS/winCodeSign）
-```
-
-**发布用的安装包**（`npm run installer`）用 NSIS 编译，自带：
-
-| 特性 | 说明 |
-| --- | --- |
-| 🖱️ **标准安装向导** | 欢迎页 → 选择安装目录 → 安装进度 → 完成页（可直接勾选"立即开始游戏"） |
-| 🏠 **默认为当前用户安装** | 装到 `%LOCALAPPDATA%\Programs\中二野人实验室`，**不需要管理员权限**，不弹 UAC |
-| 🔗 **快捷方式** | 开始菜单文件夹（含"卸载"）+ 桌面快捷方式 |
-| 🗑️ **完整卸载** | 自带 `Uninstall.exe`，并登记到「设置 → 应用 → 已安装的应用」 |
-| 🔇 **静默安装** | `安装版.exe /S`（可配 `/D=目标目录`），方便批量部署 |
-| 📦 **LZMA 压缩** | 268 MB 的运行时压到 78 MB |
-
-> 编译安装包需要 `makensis`：脚本会依次找 `MAS2Z_MAKENSIS` 环境变量 → electron-builder 缓存里的 NSIS →
-> `C:\Program Files (x86)\NSIS\makensis.exe` → PATH。装一次 [NSIS](https://nsis.sourceforge.io/) 即可。
-
-`desktop:portable` 不依赖 electron-builder：直接把 `node_modules/electron/dist` 的运行时拿来，
-游戏文件放进 `resources/app/`，把 `electron.exe` **重命名**成 `中二野人实验室.exe`，再压成 zip。
-包里附带 `启动游戏.bat` 和 `说明.txt`，解压后双击 exe 即可，完全离线。
-
-桌面版不是"把网页塞进浏览器壳"，它接上了几样原生能力：
-
-| 能力 | 说明 |
-| --- | --- |
-| 🖥️ **原生菜单** | 游戏（新的一局 `Ctrl+N`、导出 `Ctrl+S`、导入 `Ctrl+O`、图鉴 `Ctrl+G`、商店 `Ctrl+B`）/ 编辑 / 视图 / 帮助 |
-| 💾 **原生存档对话框** | 导出走"另存为"、导入走"打开文件"，不再依赖浏览器下载目录 |
-| 🪟 **窗口记忆** | 大小、位置、是否最大化都会记住；换了显示器导致窗口跑到屏幕外时会自动回到主屏 |
-| 🔒 **默认安全配置** | `contextIsolation` + `sandbox` 开启、`nodeIntegration` 关闭，只通过 preload 暴露 4 个方法，外部链接一律丢给系统浏览器 |
-| 1️⃣ **单实例** | 重复启动只会聚焦已有窗口 |
-| 🎨 **应用图标** | `tools/make-icon.py` 生成（Pillow），png + 多尺寸 ico |
-
-架构上，主进程用 `electron/boot.js` 起一个**只监听 `127.0.0.1` 随机端口**的内嵌 HTTP 服务（复用 `src/server.js`），
-渲染进程加载这个地址，所以 `web/` 那份前端代码一行都不用改就能跑；
-`web/app.js` 只多做了一件事：**检测到 `window.mas2z` 时优先使用原生对话框与菜单命令**，在浏览器里则退回原来的行为。
+曾经的 Electron 桌面客户端（原生菜单、原生存档对话框、窗口记忆、便携版 zip 与 NSIS 安装版两条产物链）
+**已下线，不再维护**——理由见上面的「平台支持」。相关源码、打包脚本、安装包模板与那一整份桌面测试
+都已从仓库移除，这里也不再提供任何命令。需要桌面体验，直接用浏览器打开网页版即可（同一份前端代码）；
+历史版本（含 exe / zip 产物与当年的桌面端源码）仍可在 git 历史与旧 release 里找到。
 
 ### 安卓客户端（APK）
 
@@ -659,6 +640,38 @@ APK 是**完全离线**的：游戏逻辑（`src/engine.js`）和界面都在包
 - 分享链接：`index.html?demo=60&mode=versus&rival=hard&weeks=3&volunteers=0` 一键看到对战结局。
 
 
+### 6.7 考前押卷（v3.6 的新玩法）
+
+一局有 **12 场考试**。以前它们只是"刷了多少知识就考多少分"；现在考前一星期（`nextExam.inWeeks <= 1`）
+行动区上方会多一张卡，你得先决定**这一场怎么赌**：
+
+| 档位 | 命中时 | 押错时 | 命中率 |
+| --- | --- | --- | --- |
+| 🔪 押重点（选一科，把范围砍到七成） | 那一科 ×1.25 | 那一科 ×0.72，且往后两周"不进则退"里掉得更快 | `0.55 + 综合素质/1000`（弱科 +0.05），夹在 0.40~0.65 |
+| 🎲 押题（花一周赌出题方向） | 全科 ×1.16 | 全科 ×0.86，疲劳 +8、心情 -2 | 固定 0.5 |
+| 🛌 考前睡够 | 疲劳 -12、心情 +2（考试当天少扣效率） | — | 不赌 |
+| 🙅 不押 | 本场 ×1.0 | — | 不赌 |
+
+- **它是判断，不是老虎机**：命中率不是凭空的——`综合素质`代表你会不会读风向（老师强调过什么、往年怎么出），
+  押**自己偏弱的科目**还有额外 5 个百分点的信息加成（弱科往往是老师单独拎出来讲的那几科）。
+  界面把概率和系数都写在按钮上，所以"押不押、押哪一科"是个能想清楚的决定。
+- **不是免费加分**：四档的期望系数都被钉在 1 附近（`test/exam-bet.test.js` 有专门一条），
+  押重点在偏科局更强、考前睡够在已经快撑不住的局更强——哪一档变成无脑最优，这个机制就退化成税。
+- **账一定要结**：押错会真的当场掉分，并且 `game.flags.betBackfire` 让那一科在接下来两周的
+  自然遗忘里额外多掉（每周结算会单独说明是哪一科、为什么），不是一句"运气不好"。
+- **不碰随机流**：命中判定用 `betRoll(game.rngState, salt)`——把随机状态当**输入**混一次、不推进它。
+  所以同种子下"押"与"不押"两条线的 `rngState`、未押科目分数逐位相同；这也是它不破坏
+  "同种子同结果"、并且能被严格测试的原因。
+- **存档兼容**：`game.examBet` / `game.examBets` 是新增字段，老存档读进来就是"这一场还没押过"；
+  手改过的存档（非法 mode / 非法科目）会被 `sanitizeExamBet` 洗回干净初值。
+- **刻意不咬**：押卷不进事件池（`calendar.js` 不用登记）、不进内容包（`PACK_FORMAT` 仍为 1）、
+  **也不进周目继承**——赌是这一局的事，赢了不该变成下一局的开局白拿。
+
+接口：`POST /api/exam-bet { gameId, mode, subject }`（`focus` 才需要 `subject`），
+服务端与离线版 `web/local-api.js` 同形；`viewState().examBet` 提供全部只读数据
+（`available / reason / exam / subjects / options / placed / history / summary`）。
+
+
 ### 7. 剧情线（故事）
 
 游戏里有 **7 条剧情线、共 36 章**，每章是一段有画面感的旁白，有些章节要你做选择：
@@ -796,33 +809,28 @@ run_class:    { grade: [1], note: '班干部竞选只在高一' },
 │       ├── events4.js     # 3 个抽象事件（路边摊 / 雨山湖划船 / 高考前夜）
 │       ├── events5.js     # 18 个校园日常事件 + 它们自带的 17 个成就
 │       ├── events6.js     # 21 个因果链事件（8 条链）+ 8 个链式成就
+│       ├── teasers.js     # 下回预告（v3.4）：每周一句能兑现的钩子，纯函数
+│       ├── exam-bets.js   # 考前押卷（v3.6）：四档的系数·命中率·额外遗忘 + 不消耗随机数的命中判定
 │       └── colleges.js    # 志愿填报：24 个专业、投档线波动、平行志愿与调剂规则
 │   ├── content.js         # 内容包（热更新）纯数据层：校验 / 合并 / 摘要 / 校验和
 │   ├── update.js          # 推送（更新清单）纯数据层：地址护栏 / 清单校验 / 决策矩阵
+│   ├── legacy.js          # 周目继承（v3.5）：选择记忆 / 阈值 / 白名单 / 只动起点
 │   └── leaderboard.js     # 排行榜纯数据层：昵称规范化 / 条目校验 / 两个榜的排序与并列 / Supabase 读写
 ├── web/
 │   ├── index.html
 │   ├── style.css
-│   ├── app.js            # 前端（浏览器 / 桌面 / 手机三端共用，自动切换服务端与离线模式）
+│   ├── app.js            # 前端（浏览器 / 手机两端共用，自动切换服务端与离线模式）
+│   ├── recap.js          # 续玩钩子 + 结局对比（v3.6）：纯函数，不碰 DOM、不 import 引擎
 │   ├── relations-view.js # 关系树 SVG + 故事线 HTML 的纯渲染函数（无 DOM，可单测）
 │   ├── local-api.js      # 页面内引擎：没有服务端时接管 /api/*，手机与 file:// 靠它离线运行
 │   ├── content/          # 内容包示例（official-pack / demo-update / 生成的快照）
 │   ├── manifest.webmanifest   # PWA 清单（可"添加到主屏幕"）
 │   └── icons/            # PWA 图标（含 maskable）
-├── electron/
-│   ├── main.cjs          # 桌面客户端主进程：窗口、菜单、IPC、单实例、安全策略
-│   ├── preload.cjs       # contextBridge：只暴露 saveFile / openFile / info / onCommand
-│   ├── boot.js           # 内嵌 HTTP 服务（复用 src/server.js，只监听 127.0.0.1 随机端口）
-│   ├── menu.js           # 原生菜单模板（纯数据，可单测）
-│   ├── window-state.js   # 窗口大小/位置持久化与离屏回退
-│   └── assets/           # 应用图标（png + 多尺寸 ico）
 ├── android/
 │   └── app/
 │       ├── AndroidManifest.xml        # minSdk 21 / targetSdk 34 / 全方向 / 声明支持所有屏幕
 │       ├── java/.../MainActivity.java # WebView + 虚拟域名拦截 assets + DOM 存储
 │       └── res/                       # 应用名、主题（含刘海屏适配）、多密度图标
-├── desktop/
-│   └── installer.nsi     # NSIS 安装包脚本（模板，占位符由编译脚本替换）
 ├── docs/                 # 官方发布页（GitHub Pages 直接托管这个目录）
 │   ├── index.html        # 手写：首屏 / 卖点 / 截图 / 下载 / 更新 / FAQ / 交流 / 关于我们
 │   ├── assets/           # 手写 style.css + site.js；生成 shots/*.jpg、og.jpg、icon-192.png
@@ -837,7 +845,7 @@ run_class:    { grade: [1], note: '班干部竞选只在高一' },
 │   ├── check-events5.mjs # 校园日常事件自检：字段 / 占位符 / 日历登记 / 用真实引擎跑每个选项
 │   ├── check-events6.mjs # 因果链自检：链图 / 日历 / 撞名 / 315 个选项与全部 risk 分支
 │   ├── build-content-pack.mjs  # 从真实源码生成内容包快照 / 规范化 / --diff 对比
-│   ├── make-icon.py      # 生成桌面 / 网页 / 安卓三套图标
+│   ├── make-icon.py      # 生成网页 / 安卓两套图标（主图落在 build/icons/，构建产物不入库）
 │   ├── module-graph.mjs  # 顺着 import 收集浏览器要用的模块（APK / 发布页 / 测试共用同一份逻辑）
 │   ├── preview-relations.mjs  # 把关系树 SVG / 故事线 HTML 落到 build/preview 供人眼检查
 │   ├── svg-preview.py    # 用 Pillow 把关系树 SVG 画成 PNG（没有浏览器时看排版用）
@@ -848,16 +856,13 @@ run_class:    { grade: [1], note: '班干部竞选只在高一' },
 │   ├── cloudflare/       # 两种自托管后端：D1 版 Worker（推荐）/ Supabase 反代 Worker + D1 建表 + 部署说明
 │   ├── serve-pages.mjs   # 本地预览发布页（正确 MIME、APK 可下载、手机可连）
 │   ├── android-sdk.mjs   # 一键装 Android SDK（不需要 Android Studio / Gradle）
-│   ├── build-apk.mjs     # 免 Gradle 直接出 APK（aapt2 + javac + d8 + zipalign + apksigner）
-│   ├── build-desktop.mjs # 免 electron-builder 出 Windows 便携版（复用 Electron 运行时 + 压缩）
-│   └── build-installer.mjs  # 用 NSIS 编译 Windows 安装包（开始菜单 / 卸载 / 静默安装）
+│   └── build-apk.mjs     # 免 Gradle 直接出 APK（aapt2 + javac + d8 + zipalign + apksigner）
 └── test/
     ├── engine.test.js    # 34 个引擎测试（选科 / 两段制 / 构筑 / NPC / 商店 / 存档 / 平衡）
     ├── cast.test.js      # 35 个随机姓名 / 阵容 / 关系树 / 剧情线 / 占位符防漏测试
     ├── calendar.test.js  # 16 个校历测试（时间表完整性 + 具体事实：高三不会捡高二学姐的钱包）
     ├── server.test.js    # 16 个接口测试（真实起服务，含 /src/** 静态资源与前端渲染联通）
     ├── web.test.js       # 17 个前端检查（资源 / id / 接口 / 渲染 / CSS 合法性 / 布局约束 / 模块图）
-    ├── electron.test.js  # 19 个桌面客户端测试（内嵌服务 / 菜单 / 窗口状态 / 安全配置 / 便携版与安装包）
     ├── android.test.js   # 16 个安卓测试（离线接口 / 工程契约 / 模块图 / 全面屏 / APK 可运行性）
     ├── custom.test.js    # 30 个「自定义人物」测试（属性点 / 性格 / 缺陷 / 自定义关系人物 /
     │                     #   自定义难度 / 传承点 / 模板 / 存档兼容 / 新结局分支可达性）
@@ -884,22 +889,29 @@ run_class:    { grade: [1], note: '班干部竞选只在高一' },
                             #   氛围句轮换 / view.teaser 真的算出来 / 界面真的画出来）
     └── legacy.test.js     # 9 个 v3.5 周目继承测试（flag 真存在 / 选择优先结局兜底 / 积累阈值 /
                             #   白名单防注入 / 只动起点不动种子 / 两端接口 / 界面守门）
+    ├── exam-bet.test.js   # 17 个 v3.6 考前押卷测试（期望不占优 / 白名单 / 不消耗随机数 /
+    │                       #   押中·押错两条分支实测倍率 / 还债真的多掉知识 / 睡够与不押的记账 /
+    │                       #   存档往返与脏存档清洗 / view 与摘要字段 / 两端接口同形 / 真实 HTTP 接口）
+    ├── exam-bet-ui.test.js # 5 个 v3.6 押卷界面守门（10 个静态 id / renderExamBet 接线 /
+    │                       #   四档顺序 / 成绩角标 / 44px 触达 / 无 :has() 无 blob: / 接口契约）
+    └── recap.test.js      # 28 个 v3.6 续玩钩子与结局对比测试（四态判定 / 坏数据降级 /
+                            #   消费即清 / 同难度自我对比 / 差一点 / 线索映射 / 界面守门）
 ```
 
-一共 **407 个测试**，`npm test` 全部通过（成品包的布局检查在没有产物时会自动跳过）。
+一共 **442 个测试**，`npm test` 全部通过（成品包的布局检查在没有产物时会自动跳过）。
 其中最有用的一个是 `android.test.js` 的最后一条：它把打好的 APK **解包**，
 直接 import 里面那份 `local-api.js` 打一局（含高考后的志愿填报）—— 只要 APK 少打包了任何一个模块，
 测试就会红，而不是等用户装到手机上看到白屏。
 `pages.test.js` 用了同一招：直接 import `docs/play/` 那份引擎打几个回合，
 所以"在线试玩"这个入口不会在发版后悄悄坏掉。
 
-游戏本体（CLI + 网页 + 引擎）**零运行时依赖**；Electron、NSIS 与 Android SDK 都只在你真正要打包时才需要。
+游戏本体（CLI + 网页 + 引擎）**零运行时依赖**；只有真正要打 APK 时才需要 Android SDK
+（`tools/make-icon.py` / `svg-preview.py` 另需 Pillow，纯可选）。
 
 ### 没有浏览器时怎么验证界面
 
-这个项目是在一个**开不了浏览器窗口、也开不了 Electron** 的环境里开发和验证的
-（本机 Electron 连 `--version` 都会因为 crashpad 初始化失败而崩）。所以补了两个工具，
-把"界面"变成"可以量、可以测"的东西：
+这个项目是在一个**开不了浏览器窗口**的环境里开发和验证的（当年连 Electron 桌面版都跑不起来）。
+所以补了两个工具，把"界面"变成"可以量、可以测"的东西：
 
 ```bash
 node tools/layout-probe.mjs --port 4100
@@ -945,15 +957,14 @@ index.html?demo=60&mode=versus&rival=hard&weeks=3&volunteers=0
 | --- | --- | --- | --- |
 | `dist/中二野人实验室-3.4.0-debug.apk` | `npm run apk` | 0.49 MB | 安卓侧载包（含热更新 + 推送 + 交流入口 + AI 对战 + 排行榜 + 下回预告） |
 | `dist/中二野人实验室-3.4.0-发布页.zip` | `npm run pages` | 1.5 MB | 官方发布页：解压后推到 GitHub Pages（含在线试玩 + 排行榜 + 截图 + APK） |
-| `dist/desktop/…-安装版.exe` | `npm run installer` | 78 MB | Windows：双击安装，带向导/快捷方式/卸载 |
-| `dist/desktop/…-win-x64.zip` | `npm run desktop:portable` | 110 MB | Windows：免安装绿色版，解压即玩 |
+
+> 📱 **现在只有两个交付目标**：安卓 APK 与网页版；桌面成品（exe / zip）已下线，不再产出。
 
 > 🔄 **发版之后还能改内容**：把内容包 JSON 发给玩家（或放到一个 https 地址），
 > 玩家在「内容包」面板导入就能生效——新事件、新道具、平衡调整都不用重新发版。
 > 只有引擎规则变化（比如这次的志愿填报）才需要出新 APK。
 
-> ⚠️ 所有产物**都没有代码签名**：Windows SmartScreen 首次运行会提示"未知发布者"，
-> 安卓安装时会提示"未知来源应用"。前者需要买代码签名证书 + `signtool`，后者需要正式签名密钥。
+> ⚠️ 产物**没有代码签名**：安卓安装时会提示"未知来源应用"，需要正式签名密钥；
 > 这是所有个人项目的通病，不是打包问题。
 >
 > 安卓那边用的是 **debug 签名**（`android/debug.keystore`，口令都是 `android`）。
@@ -1038,8 +1049,9 @@ v2.1 的存档里没有人物阵容和剧情记录，读进来会按种子把同
   代词用 `${cast.deskmate.ta}`，**不要写死"张昊""王老师"**——那些名字每局都不一样
   （而且玩家可以自己给同桌起名，写死了就会串戏）。
   `week` 是"第几周之后才能触发"，一条线里要保持递增。
-- **调平衡之外别忘的三件事**：`npm test`（383 个测试，包含剧情结构、姓名生成、
+- **调平衡之外别忘的三件事**：`npm test`（442 个测试，包含剧情结构、姓名生成、
   自制人物、内容包、事件日历、AI 对战的时间线与随机流隔离、排行榜的排序与后端降级、
+  考前押卷的期望与"不消耗随机数"、续玩钩子的跨会话判定，
   两种自托管后端的边界（白名单 / 校验 / 限流），以及发布页的链接 / 素材 / 交互守门测试）、
   `python tools/build-pages-shots.py && node tools/build-pages.mjs`（界面改过之后重出发布页素材与产物）、
   `node tools/preview-relations.mjs` + `python tools/svg-preview.py`（不用开浏览器就能看关系树排版）。

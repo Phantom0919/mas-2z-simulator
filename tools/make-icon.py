@@ -2,12 +2,14 @@
 
 用法：  python tools/make-icon.py
 输出：
-    electron/assets/icon.png            512×512（圆角、带透明边角）
-    electron/assets/icon.ico            16/24/32/48/64/128/256 多尺寸
+    build/icons/icon.png                512×512 主图（圆角、带透明边角；构建产物，不入库）
     web/icons/icon-192.png, icon-512.png
     web/icons/icon-maskable-512.png     满幅不透明，供 Android 自适应图标裁切
     android/app/res/mipmap-*/ic_launcher.png   mdpi…xxxhdpi 五档
     build/icon-preview.png              自检用对比图（真实尺寸 + 圆形/圆角遮罩）
+
+只服务两个仍在维护的平台：网页版（PWA）与安卓 APK。
+Windows 桌面版已下线，所以不再生成 `.ico`，主图也不再写进已删除的 `electron/assets/`。
 
 设计意图（一句话）：**晨光从翻开的书后面升起来**。
     · 书      —— 高中三年最核心的意象：课本、晚自习、写满字的纸页。
@@ -38,7 +40,7 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT_DIR = ROOT / "electron" / "assets"
+OUT_DIR = ROOT / "build" / "icons"   # 主图：构建产物，不进仓库（build/ 已 gitignore）
 SIZE = 512          # 最终图标边长
 SS = 4              # 超采样倍率
 CANVAS = SIZE * SS  # 绘制画布 2048
@@ -398,7 +400,7 @@ def write_preview(icon: Image.Image, path: Path) -> None:
     rounded = Image.new("L", (192, 192), 0)
     ImageDraw.Draw(rounded).rounded_rectangle([0, 0, 191, 191], radius=43, fill=255)
     y = pad + cell_h + lab + 24
-    for j, (mask, title) in enumerate(((circle, "192 圆形遮罩（Android）"), (rounded, "192 圆角遮罩（桌面）"))):
+    for j, (mask, title) in enumerate(((circle, "192 圆形遮罩（Android）"), (rounded, "192 圆角遮罩（PWA / 通用）"))):
         box = Image.new("RGB", (cell_w, cell_h), (40, 43, 48))
         board = Image.new("RGB", (192, 192), (72, 76, 84))
         board.paste(big, (0, 0), mask)
@@ -423,11 +425,7 @@ def main() -> None:
 
     png_path = OUT_DIR / "icon.png"
     icon.save(png_path)
-    print(f"已生成 {png_path.relative_to(ROOT)} （{icon.width}×{icon.height}）")
-
-    ico_path = OUT_DIR / "icon.ico"
-    icon.save(ico_path, sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
-    print(f"已生成 {ico_path.relative_to(ROOT)} （16/24/32/48/64/128/256）")
+    print(f"已生成 {png_path.relative_to(ROOT)} （{icon.width}×{icon.height}，主图）")
 
     # 网页 / PWA
     web_icons = ROOT / "web" / "icons"

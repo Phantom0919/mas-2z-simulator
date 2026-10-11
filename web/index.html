@@ -118,6 +118,26 @@
         </div>
         <div class="phase-banner" id="phase-badge"></div>
         <div class="action-tabs" id="action-tabs"></div>
+        <!-- 考前押卷（v3.6）：考前一星期才出现，就在行动区上方，拇指够得到。
+             骨架静态写在这里，内容由 renderExamBet() 填（押完变"已押"文案）。 -->
+        <div class="exam-bet-card hidden" id="exam-bet-card">
+          <div class="exam-bet-head">
+            <span class="exam-bet-icon">🔪</span>
+            <div>
+              <div class="exam-bet-title" id="exam-bet-title"></div>
+              <div class="exam-bet-when" id="exam-bet-when"></div>
+            </div>
+          </div>
+          <p class="exam-bet-desc" id="exam-bet-desc"></p>
+          <!-- 科目选择放在四个档位上面：点「押重点」之后它就出现在视野里，不用滚动（手机上滚动很容易滚丢） -->
+          <div class="exam-bet-subject-wrap hidden" id="exam-bet-subject-wrap">
+            <p class="exam-bet-subject-hint" id="exam-bet-subject-hint"></p>
+            <div class="exam-bet-subject" id="exam-bet-subject"></div>
+          </div>
+          <div class="exam-bet-options" id="exam-bet-options"></div>
+          <div class="exam-bet-placed hidden" id="exam-bet-placed"></div>
+          <div class="exam-bet-history" id="exam-bet-history"></div>
+        </div>
         <div id="actions" class="actions"></div>
       </section>
 
@@ -141,6 +161,19 @@
           先把"这个人"捏出来：姓名、外号、头像、性格、天赋、短板，还有能自由分配的开局属性点。
           三年后的结局，从这一页就开始写了。
         </p>
+
+        <!-- 续玩钩子账本（v3.6）：跨会话记住"上次停在哪儿"。
+             骨架静态写在这里（id 必须静态存在，守门测试盯着）；内容由 renderResumeCard() 填。
+             第一局的人看不到这张卡（.hidden）。 -->
+        <div class="resume-card hidden" id="resume-card" aria-live="polite">
+          <div class="resume-title" id="resume-title"></div>
+          <div class="resume-lines" id="resume-lines"></div>
+          <div class="start-actions resume-actions">
+            <button type="button" id="btn-resume-run" class="primary big hidden">▶ 接着上</button>
+            <button type="button" id="btn-resume-fresh" class="ghost big hidden">重新捏一个人</button>
+            <button type="button" id="btn-resume-gallery" class="ghost big hidden">📖 看看图鉴</button>
+          </div>
+        </div>
 
         <!-- 周目继承（v3.5）：上一局的选择会长成这一局的起点，可以一键关掉 -->
         <div id="inherit-card" class="inherit-card hidden">
@@ -543,7 +576,12 @@
     <div class="overlay hidden" id="ending-modal">
       <div class="card ending-card">
         <div id="ending-body"></div>
+        <!-- 「上一次的你」（v3.6）：和上一次同难度的自己比，没有可比的人就整块隐藏 -->
+        <div class="mirror-strip hidden" id="ending-compare"></div>
+        <!-- 「差一点」：还没解锁的结局里最近的两条，线索逐字来自结局目录 -->
+        <div class="near-list hidden" id="ending-next"></div>
         <div class="start-actions">
+          <button id="btn-ending-next" class="ghost big hidden">带着这条线索开新局</button>
           <button id="btn-restart" class="primary big">再来一局</button>
           <button id="btn-ending-share" class="ghost big">📣 分享这一局</button>
           <button id="btn-ending-leaderboard" class="ghost big">🏆 上榜</button>

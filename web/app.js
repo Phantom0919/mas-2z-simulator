@@ -36,11 +36,28 @@ import {
   relationsSvg,
   storyBodyHtml,
 } from './relations-view.js';
+import {
+  buildHook,
+  clearHook,
+  leadToDraft,
+  nearestUndiscovered,
+  readHook,
+  resumeCard,
+  selfCompare,
+  writeHook,
+} from './recap.js';
 
 /** 跨局图鉴的 localStorage 键（题目约定，勿改）。 */
 const PROFILE_KEY = 'mas2z-profile-v2';
 /** 自动存档的 localStorage 键。 */
 const SAVE_KEY = 'mas2z-save-v2';
+/**
+ * 续玩钩子账本的 localStorage 键（v3.6）。
+ *
+ * ⚠️ 这份字符串在 `web/recap.js` 里还有一份（`HOOK_KEY`）：那边负责解析与写入，
+ * 这边只负责读原文。改名字要两处一起改 + 同步 CHANGELOG。
+ */
+const HOOK_KEY = 'mas2z-hook-v1';
 /** 自定义人物角色卡的 localStorage 键。 */
 const CARD_KEY = 'mas2z-cards-v1';
 /** 天赋固定选 2 个（与引擎 EFF.maxTraits 一致）。 */
@@ -51,8 +68,8 @@ const MAX_FLAWS = 1;
  * 腾讯频道【模拟器发布页】。
  *
  * 只在这里写一次，HTML 里的链接、复制按钮、分享文案全用它。
- * 它是真链接（不是按钮）：浏览器新开标签页、桌面端交给系统浏览器
- * （electron/main.cjs）、安卓端跳出 WebView（MainActivity.shouldOverrideUrlLoading）。
+ * 它是真链接（不是按钮）：浏览器自己接管（新标签页 / 系统浏览器）、
+ * 安卓端跳出 WebView（MainActivity.shouldOverrideUrlLoading）。
  * 在网页上玩的人也就多了，所以这个地址必须能被复制出去。
  */
 const COMMUNITY_URL = 'https://pd.qq.com/s/c38ht6k4r';
@@ -569,6 +586,189 @@ function renderTeaser(view) {
     <span class="teaser-text"><b>下回预告</b>${escapeHtml(teaser.text)}</span>`;
 }
 
+/* ------------------------------------------------------------ 考前押卷（v3.6） */
+
+/** 四档押卷的图标。历史记录里没有 icon 字段，所以界面按 mode 补一个。 */
+const BET_ICONS = { focus: '🔪', gamble: '🎲', rest: '🛌', none: '🙅' };
+const BET_FALLBACK_ICON = '🎯';
+
+const betIcon = (mode) => BET_ICONS[mode] ?? BET_FALLBACK_ICON;
+
+/** '押重点（砍范围）' → '押重点'：成绩条上的角标只放得下短的。 */
+function betShortName(name) {
+  return String(name ?? '').replace(/（[^）]*）/g, '').trim() || '押卷';
+}
+
+/** 命中率只认 0~1 的数字；`rest` / `none` 的 1 不当成"100% 命中"来念。 */
+function betPercent(chance) {
+  const value = Number(chance);
+  return Number.isFinite(value) ? `${Math.round(value * 100)}%` : '—';
+}
+
+const betIsGamble = (mode) => mode === 'focus' || mode === 'gamble';
+
+/**
+ * 考前押卷（v3.6）：考前一星期出现在行动区上方的一张卡。
+ *
+ * 界面只读 `view.examBet`（窗口 / 命中率 / 这一场押了什么 / 每一场的历史都在里面），
+ * **一个接口都不用加**。`available === false` 时直接显示引擎给的 `reason`——
+ * 那句整话是引擎按规则算的，界面自己拼一份迟早会跟规则对不上。
+ *
+ * 押卷是"这一局的赌"，赢了不进周目继承（引擎那边也一条都没加），
+ * 所以这里既不报喜也不劝赌：只把命中的概率和代价摊开给玩家看。
+ */
+function renderExamBet(view) {
+  const card = $('exam-bet-card');
+  if (!card) return;
+  const bet = view?.examBet;
+  const exam = bet?.exam ?? null;
+  if (!exam) {
+    // 没有下一场考试（毕业 / 结局）：整块不出现
+    card.classList.add('hidden');
+    return;
+  }
+  card.classList.remove('hidden');
+  $('exam-bet-title').textContent = `${BET_ICONS.focus} 考前押卷 · ${exam.name}`;
+  $('exam-bet-when').textContent =
+    exam.inWeeks > 0 ? `还有 ${exam.inWeeks} 周（考前 ${bet.windowWeeks ?? 1} 周内可以押）` : '就在这一周';
+
+  const options = $('exam-bet-options');
+  const subjectWrap = $('exam-bet-subject-wrap');
+  const placedBox = $('exam-bet-placed');
+  // 每次重画都先收起"科目选择"：上一次展开的状态不该跨周留着
+  subjectWrap.classList.add('hidden');
+  $('exam-bet-subject').innerHTML = '';
+
+  if (bet.available) {
+    $('exam-bet-desc').textContent = '进考场前做一次判断：砍范围、赌方向、睡够，还是什么都不押。';
+    placedBox.classList.add('hidden');
+    placedBox.textContent = '';
+    options.classList.remove('hidden');
+    options.innerHTML = (bet.options ?? []).map(examBetOptionHtml).join('');
+    for (const button of options.querySelectorAll('button[data-bet]')) {
+      button.addEventListener('click', () => onExamBetOption(button.dataset.bet));
+    }
+  } else {
+    $('exam-bet-desc').textContent = bet.reason ?? ''; // 引擎写好的整句话，原样显示
+    options.classList.add('hidden');
+    options.innerHTML = '';
+    if (bet.placed) {
+      placedBox.classList.remove('hidden');
+      placedBox.textContent = examBetPlacedText(bet.placed);
+    } else {
+      placedBox.classList.add('hidden');
+      placedBox.textContent = '';
+    }
+  }
+
+  renderExamBetHistory(bet.history ?? []);
+}
+
+/** 一个押卷档位：名字 + 命中率 + 引擎给的 desc / risk / gain，一个字都不改写。 */
+function examBetOptionHtml(option) {
+  const chance = betIsGamble(option.id) ? `<span class="exam-bet-chance">命中 ${betPercent(option.hitChance)}</span>` : '';
+  return `<button type="button" class="exam-bet-option" data-bet="${escapeHtml(option.id)}">
+    <span class="exam-bet-option-head">
+      <span class="exam-bet-icon">${escapeHtml(option.icon)}</span>
+      <span class="exam-bet-option-name">${escapeHtml(option.name)}</span>
+      ${chance}
+    </span>
+    <span class="exam-bet-option-desc">${escapeHtml(option.desc)}</span>
+    <span class="exam-bet-option-facts">
+      <span class="exam-bet-risk">⚠ ${escapeHtml(option.risk)}</span>
+      <span class="exam-bet-gain">＋ ${escapeHtml(option.gain)}</span>
+    </span>
+  </button>`;
+}
+
+/** 已经押过之后的收口文案：押重点/押题说"考完才知道对不对"，睡够/不押就直说。 */
+function examBetPlacedText(placed) {
+  const what = placed.subjectName ? `${betShortName(placed.modeName)} · ${placed.subjectName}` : betShortName(placed.modeName);
+  if (betIsGamble(placed.mode)) return `✅ 已押：${what}（命中率 ${betPercent(placed.hitChance)}）。考完才知道对不对。`;
+  if (placed.mode === 'rest') return '✅ 这一场：考前睡够。你没押分数，把灯关了。';
+  return '✅ 这一场：不押。复习到哪算哪。';
+}
+
+/** 历史角标：`期中考试 🔪 押重点 · 数学 ✔ 命中 ×1.25`。 */
+function examBetHistoryText(entry) {
+  const icon = betIcon(entry.mode);
+  const subject = entry.subjectName ? ` · ${entry.subjectName}` : '';
+  if (betIsGamble(entry.mode)) {
+    const mark = entry.hit ? '✔ 命中' : '✘ 押错';
+    const factor = Number(entry.factor) && Number(entry.factor) !== 1 ? ` ×${entry.factor}` : '';
+    return `${entry.name} ${icon} ${betShortName(entry.modeName)}${subject} ${mark}${factor}`;
+  }
+  // 睡够 / 不押：没有命中判定，用引擎给的那句 note 说清这一场干了什么
+  return `${entry.name} ${icon} ${betShortName(entry.modeName)}${entry.note ? ` · ${entry.note}` : ''}`;
+}
+
+function renderExamBetHistory(history) {
+  const box = $('exam-bet-history');
+  box.innerHTML = history
+    .slice()
+    .reverse()
+    .map((entry) => {
+      const tone = betIsGamble(entry.mode) ? (entry.hit ? 'hit' : 'miss') : 'plain';
+      return `<span class="exam-bet-chip ${tone}">${escapeHtml(examBetHistoryText(entry))}</span>`;
+    })
+    .join('');
+}
+
+/** 点了一个档位：要选科目的先展开科目列表，其余直接下注。 */
+function onExamBetOption(mode) {
+  const bet = state.view?.examBet;
+  if (!bet?.available || state.busy) return;
+  const option = (bet.options ?? []).find((item) => item.id === mode);
+  if (option?.needsSubject) {
+    openExamBetSubjects(mode);
+    return;
+  }
+  void submitExamBet(mode, null);
+}
+
+/**
+ * 押重点要指定科目：先把候选画出来。
+ *
+ * 点一下就下注（不额外加"确认"按钮——手机上多一次点击就多一次放弃），
+ * 默认把第一个弱科高亮出来，因为押自己的弱科命中率会高一点（引擎的规则）。
+ */
+function openExamBetSubjects(mode) {
+  const bet = state.view?.examBet;
+  const subjects = bet?.subjects ?? [];
+  if (subjects.length === 0) return;
+  const wrap = $('exam-bet-subject-wrap');
+  wrap.classList.remove('hidden');
+  $('exam-bet-subject-hint').textContent = '押哪一科？点一下就下注——带「弱科」标记的那几科，命中率会高一点。';
+  $('exam-bet-subject').innerHTML = subjects
+    .map(
+      (subject) => `<button type="button" class="exam-bet-chip${subject.weak ? ' weak' : ''}" data-subject="${escapeHtml(
+        subject.key,
+      )}">
+        ${escapeHtml(subject.name)}${subject.weak ? '<span class="exam-bet-weak">弱科</span>' : ''}
+        <span class="exam-bet-chance">${betPercent(subject.chance)}</span>
+      </button>`,
+    )
+    .join('');
+  for (const button of $('exam-bet-subject').querySelectorAll('button[data-subject]')) {
+    button.addEventListener('click', () => void submitExamBet(mode, button.dataset.subject));
+  }
+  const preferred = subjects.find((subject) => subject.weak) ?? subjects[0];
+  const node = $('exam-bet-subject').querySelector(`button[data-subject="${CSS.escape(preferred.key)}"]`);
+  node?.classList.add('on');
+}
+
+/** 下注。`guard()` 会在请求期间把整张卡里的按钮都禁用掉（防连点）。 */
+async function submitExamBet(mode, subject) {
+  await guard($('exam-bet-card'), async () => {
+    const payload = await api('/api/exam-bet', {
+      method: 'POST',
+      body: { gameId: state.gameId, mode, subject: subject ?? undefined },
+    });
+    if (payload.lines?.length) showTurnLines(payload.lines);
+    render(payload.view);
+  });
+}
+
 function renderLog(view) {
   $('log').innerHTML =
     view.log
@@ -585,6 +785,19 @@ function renderLog(view) {
       .join('') || '<p class="muted">还没有发生什么。</p>';
 }
 
+/** 成绩条上的押卷角标：`🔪 押重点 ✔`，点不动但鼠标停上去能看全。 */
+function examBetBadge(exam) {
+  const bet = exam.bet;
+  if (!bet) return '';
+  const factor = Number(bet.factor) && Number(bet.factor) !== 1 ? ` ×${bet.factor}` : '';
+  const title = `${betShortName(bet.modeName)}${bet.subjectName ? ` · ${bet.subjectName}` : ''}${
+    betIsGamble(bet.mode) ? `（命中率 ${betPercent(bet.chance)}）` : ''
+  }${factor}`;
+  return `<span class="exam-bet-chip ${bet.hit ? 'hit' : 'miss'}" title="${escapeHtml(title)}">${betIcon(
+    bet.mode,
+  )} ${escapeHtml(betShortName(bet.modeName))} ${bet.hit ? '✔' : '✘'}</span>`;
+}
+
 function renderExams(view) {
   $('exams').innerHTML = view.exams.length
     ? view.exams
@@ -595,6 +808,7 @@ function renderExams(view) {
           <div class="exam-row">
             <span class="exam-name">${escapeHtml(exam.name)}</span>
             <span><b>${exam.total}</b> 分　第 ${exam.rank} 名</span>
+            ${examBetBadge(exam)}
           </div>`,
         )
         .join('')
@@ -621,6 +835,7 @@ function renderPanels(view) {
   renderItems(view);
   renderActions(view);
   renderTeaser(view);
+  renderExamBet(view);
   renderLog(view);
   renderExams(view);
 }
@@ -1508,10 +1723,131 @@ async function persist() {
   } catch {
     /* 自动存档失败不影响游戏 */
   }
+  /*
+   * 续玩钩子账本（v3.6）：每次行动 / 事件 / 结局之后顺手把"上次停在哪儿"写下来。
+   *
+   * 只写本地、不走接口，所以不额外发一个请求；它已经在每次进度变化之后被调用，
+   * 不需要新的调用点。写不下（配额满 / 隐私模式）就算了，游戏本身不受影响。
+   */
+  const hook = buildHook(state.view);
+  if (hook) writeHook(hook);
 }
 
 function updateContinueButton() {
   $('btn-continue').hidden = !localStorage.getItem(SAVE_KEY);
+}
+
+/* ------------------------------------------------------------ 续玩卡（v3.6） */
+
+/** 读 localStorage 原文。存储被禁（隐私模式）时返回 null，不能让它把开屏搞崩。 */
+function readStored(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/** `+38` / `-156`：只报数字，形容词交给玩家自己。 */
+function signed(value) {
+  return `${value > 0 ? '+' : ''}${value}`;
+}
+
+/** 续玩卡里的一行：预告是引擎原文，其余是我们自己的话。 */
+function resumeLineHtml(line) {
+  if (line.kind === 'teaser') {
+    const lead = line.lead ? `<span class="resume-hook-lead">${escapeHtml(line.lead)}</span>` : '';
+    return `<blockquote class="resume-hook teaser-${escapeHtml(line.tone ?? 'calm')}">
+      <span class="resume-hook-icon">${escapeHtml(line.icon)}</span>
+      <span>${lead}${escapeHtml(line.text)}</span>
+    </blockquote>`;
+  }
+  const cls = line.kind === 'meta' ? 'resume-meta' : 'resume-note';
+  return `<p class="${cls}">${escapeHtml(line.text)}</p>`;
+}
+
+/** 把卡片的动作挂到静态按钮上；没有动作就藏起来（绝不留下点不动的按钮）。 */
+function setResumeButton(id, action) {
+  const button = $(id);
+  if (!button) return;
+  if (!action) {
+    button.classList.add('hidden');
+    button.dataset.kind = '';
+    return;
+  }
+  button.textContent = action.label;
+  button.dataset.kind = action.kind;
+  button.classList.remove('hidden');
+}
+
+/**
+ * 开局屏最上面那张「上次走到哪儿」。
+ *
+ * 刻意**同步**渲染、而且放在 `await detectApiMode()` 之前：读的是 localStorage，
+ * 本来就没有网络，不该让首屏最贵的两个 await 把这张卡拖到后面。
+ * 选项还没读回来时图鉴计数先不显示，`applyOptions()` 之后会再刷一遍补上数字。
+ */
+function renderResumeCard() {
+  const card = $('resume-card');
+  if (!card) return;
+  const model = resumeCard({
+    hook: readHook(readStored(HOOK_KEY)),
+    profile: loadProfile(),
+    catalog: state.options?.catalog ?? [],
+    hasSave: Boolean(readStored(SAVE_KEY)),
+  });
+
+  if (model.mode === 'fresh') {
+    card.classList.add('hidden');
+    $('resume-title').textContent = '';
+    $('resume-lines').innerHTML = '';
+    setResumeButton('btn-resume-run', null);
+    setResumeButton('btn-resume-fresh', null);
+    setResumeButton('btn-resume-gallery', null);
+    return;
+  }
+
+  card.classList.remove('hidden');
+  $('resume-title').textContent = model.title;
+  $('resume-lines').innerHTML = model.lines.map(resumeLineHtml).join('');
+  setResumeButton('btn-resume-run', model.primary);
+  // 「重新捏一个人」和「看看图鉴」是两个位置固定的静态按钮，具体给哪个由 mode 决定
+  setResumeButton('btn-resume-fresh', model.secondary?.kind === 'fresh' ? model.secondary : null);
+  setResumeButton('btn-resume-gallery', model.secondary?.kind === 'gallery' ? model.secondary : null);
+}
+
+/**
+ * 续玩卡上的"重新捏一个人"：把钩子消费掉。
+ *
+ * 不清存档（#btn-continue 还在，存档是玩家的东西）；清的是"这条钩子"，
+ * 这样下次开屏不会再念同一句旧话。表单就写在卡片下面，所以不做"重置构筑"，
+ * 免得把玩家已经改了一半的东西冲掉。
+ */
+function dismissResumeCard() {
+  clearHook();
+  $('resume-card').classList.add('hidden');
+  toast('好，那就重新捏一个。');
+}
+
+/** 续玩卡的点击入口：动作语义写在 dataset.kind 里（见 setResumeButton）。 */
+function onResumeClick(event) {
+  const kind = event.currentTarget.dataset.kind;
+  if (kind === 'resume') {
+    void resumeSave();
+    return;
+  }
+  if (kind === 'gallery') {
+    openGalleryModal();
+    return;
+  }
+  if (kind === 'fresh') {
+    dismissResumeCard();
+    return;
+  }
+  if (kind === 'restart') {
+    backToStart();
+    toast('构筑都还在，改完点「开始三年」。');
+  }
 }
 
 /* ------------------------------------------------------------ 弹层 */
@@ -1627,6 +1963,24 @@ function emptyProfile() {
   return { version: 2, runs: 0, unlocked: {}, history: [] };
 }
 
+/**
+ * 档案迁移（v3.6）：老档案里的一局没有 `difficulty` / `mode`。
+ *
+ * 这里**只补形状，不补内容**：缺 `difficulty` 就留 `null`（表示"不知道"），
+ * 绝不拿"现在的难度"去顶替——那样会凭空造出一个"同难度第 1 名"。
+ * 结局页的自我对比只在条目真的写了难度、并且和这一局相同时才说「同难度」。
+ */
+function migrateHistory(history) {
+  if (!Array.isArray(history)) return [];
+  return history
+    .filter((run) => run && typeof run === 'object' && !Array.isArray(run))
+    .map((run) => ({
+      ...run,
+      difficulty: typeof run.difficulty === 'string' ? run.difficulty : null,
+      mode: run.mode === 'versus' ? 'versus' : 'solo',
+    }));
+}
+
 function loadProfile() {
   try {
     const raw = localStorage.getItem(PROFILE_KEY);
@@ -1636,7 +1990,7 @@ function loadProfile() {
       version: 2,
       runs: Number(data.runs) || 0,
       unlocked: data.unlocked && typeof data.unlocked === 'object' ? data.unlocked : {},
-      history: Array.isArray(data.history) ? data.history : [],
+      history: migrateHistory(data.history),
       // v3.5 周目继承：上一局写下了哪些"选择记忆"，以及累计成就数
       achievementCount: Number(data.achievementCount) || 0,
       lastRun: data.lastRun && typeof data.lastRun === 'object' ? data.lastRun : null,
@@ -1681,6 +2035,13 @@ function recordRun(view) {
     achievements: (ending.achievements ?? []).map((item) => item.name),
     cast: (ending.cast ?? []).map((person) => `${person.role} ${person.name}`),
     story: (ending.story ?? []).length,
+    /*
+     * v3.6：结局页要跟"上一次同难度的自己"比，档案条目就得自己带上口径。
+     * 难度在 view.difficulty.key（引擎把 rulesOf(game) + key 一起挂在 view.difficulty 上）；
+     * 玩法只分单人 / AI 对战两种，别把对战局和单人局混在一个榜里比。
+     */
+    difficulty: view.difficulty?.key ?? state.draft.difficulty ?? null,
+    mode: view.versus?.active ? 'versus' : 'solo',
     at: entry.at,
   });
   profile.history = profile.history.slice(0, 30);
@@ -2681,6 +3042,116 @@ async function submitCurrentRun({ announce = true } = {}) {
 
 /* ------------------------------------------------------------ 结局 */
 
+/** 点「带着这条线索开新局」时要带进下一局的结局 id（renderEndingCompare 里写）。 */
+let endingLeadId = null;
+
+/**
+ * 结局页的两块（v3.6，全部本机数据、零新接口）：
+ *
+ *   1. 「上一次的你」：和上一次**同难度**的自己比分数 / 成就 / 本机最好。
+ *      没有可比的一局 → 整块隐藏（不是显示 0）。老档案条目没有 difficulty →
+ *      只说"上一次的你"，绝不说「同难度」（拿现在的难度去顶替就是编数据）。
+ *   2. 「差一点」：还没解锁的结局里最近的两条，线索**逐字**来自结局目录的 hint。
+ *
+ * 文案全是陈述句：分数降了也只是 `-156`，没有"退步 / 不如"这类评判。
+ */
+function renderEndingCompare(ending) {
+  const profile = loadProfile();
+  const history = profile.history;
+  /*
+   * render() / continueToEnding() 都是先 recordRun() 再 renderEnding()，
+   * 所以 history[0] 就是这一局，对比时要把它排除。万一段落顺序变了，
+   * 就按"全部都算上一局"处理——宁可少显示，也不能把这一局和自己比。
+   */
+  const head = history[0];
+  const isCurrent = Boolean(head && head.endingId === ending.id && (head.total ?? null) === (ending.total ?? null));
+  const previousRuns = isCurrent ? history.slice(1) : history;
+  const difficultyKey = state.view?.difficulty?.key ?? null;
+  const difficultyName = difficultyKey ? difficultyLabel(difficultyKey) : null;
+
+  const compare = selfCompare(previousRuns, {
+    total: ending.total ?? null,
+    achievements: (ending.achievements ?? []).map((item) => item.name),
+    difficulty: difficultyKey,
+    difficultyLabel: difficultyName,
+    runNumber: Math.max(1, profile.runs),
+  });
+
+  const box = $('ending-compare');
+  if (!compare.prev) {
+    // 没有可比的一局：整块不显示（不是显示 0）
+    box.classList.add('hidden');
+    box.innerHTML = '';
+  } else {
+    box.classList.remove('hidden');
+    // 只有"上一次也是这个难度"时才敢把这两局并排比
+    const sameTag = compare.sameDifficulty?.label ? `（同难度「${compare.sameDifficulty.label}」）` : '';
+    const prevScore = compare.prev.total === null ? '未参加高考' : `${compare.prev.total} 分`;
+    const prevGoal =
+      compare.prev.goalAchieved === null ? '' : ` · 目标${compare.prev.goalAchieved ? '已达成' : '未达成'}`;
+    const mine = ending.total == null ? '未参加高考' : `${ending.total} 分`;
+    const delta = compare.deltaTotal === null ? '' : `（${signed(compare.deltaTotal)}）`;
+    const goal = ending.goal ? ` · 目标${ending.goal.achieved ? '已达成' : '未达成'}` : '';
+    const achievements = (ending.achievements ?? []).length;
+    const achievementDelta =
+      compare.deltaAchievements === null || compare.deltaAchievements === 0 ? '' : `（${signed(compare.deltaAchievements)}）`;
+    const rank = compare.sameDifficulty?.label
+      ? ` · 同难度「${compare.sameDifficulty.label}」第 ${compare.sameDifficulty.rank} 名`
+      : '';
+
+    box.innerHTML = [
+      `<div class="mirror-head">🪞 上一次的你　${prevScore}${sameTag}${prevGoal}</div>`,
+      `<div class="mirror-line">　这一次 ${mine}${delta}${goal} · 成就 ${achievements} 个${achievementDelta}</div>`,
+      compare.best
+        ? `<div class="mirror-best">🏅 本机最好：${compare.best.total} 分（第 ${compare.best.ordinal} 局）${rank}</div>`
+        : '',
+    ].join('');
+  }
+
+  const catalog = state.options?.catalog ?? [];
+  const unlockedInCatalog = catalog.filter((entry) => profile.unlocked[entry.id]).length;
+  const near = nearestUndiscovered(catalog, profile, 2);
+  const nearBox = $('ending-next');
+  if (near.length === 0) {
+    nearBox.classList.add('hidden');
+    nearBox.innerHTML = '';
+  } else {
+    nearBox.classList.remove('hidden');
+    nearBox.innerHTML = [
+      `<div class="near-head">🎯 差一点（本机图鉴 ${unlockedInCatalog} / ${catalog.length}）</div>`,
+      ...near.map(
+        (item) => `<div class="near-item"><span class="near-lock">🔒</span>
+        <span><span class="near-title">${escapeHtml(item.title)}</span>
+        <span class="near-hint">线索：${escapeHtml(item.hint)}</span></span></div>`,
+      ),
+    ].join('');
+  }
+  endingLeadId = near[0]?.id ?? null;
+  $('btn-ending-next').classList.toggle('hidden', !endingLeadId);
+}
+
+/**
+ * 「带着这条线索开新局」：把线索转成开局构筑，再回开局屏。
+ * 映射不到（`leadToDraft` 返回 null）就只回开局屏——不假装给了建议。
+ */
+function openNextRunFromLead() {
+  const lead = leadToDraft(endingLeadId);
+  $('ending-modal').classList.add('hidden');
+  if (lead?.preset && listOf('presets').some((item) => item.id === lead.preset)) {
+    applyPreset(lead.preset);
+  } else if (lead && (lead.track || lead.goal || Array.isArray(lead.traits))) {
+    if (lead.track && listOf('tracks').some((item) => item.id === lead.track)) state.draft.track = lead.track;
+    if (lead.goal && listOf('goals').some((item) => item.id === lead.goal)) state.draft.goal = lead.goal;
+    if (Array.isArray(lead.traits)) {
+      state.draft.traits = lead.traits
+        .filter((id) => listOf('traits').some((item) => item.id === id))
+        .slice(0, traitLimit());
+    }
+  }
+  backToStart();
+  toast(lead ? '线索已经带进下一局的构筑，想改随时改。' : '线索记下了——构筑你自己定，想改随时改。');
+}
+
 function renderEnding(ending) {
   const goal = ending.goal;
   const goalHtml = goal
@@ -2767,6 +3238,8 @@ function renderEnding(ending) {
         : ''
     }
   `;
+  // 「上一次的你 + 差一点」：写在结局正文之后、按钮之前（两个容器在 index.html 里静态写死）
+  renderEndingCompare(ending);
   $('ending-modal').classList.remove('hidden');
 }
 
@@ -2972,6 +3445,8 @@ function backToStart() {
    */
   renderBuildForm();
   updateContinueButton();
+  // 续玩卡要在回开局屏时重新算一次：上一次可能刚打完一局，卡片的 mode 会变
+  renderResumeCard();
 }
 
 function bind() {
@@ -3104,6 +3579,14 @@ function bind() {
   $('btn-volunteer-submit').addEventListener('click', submitVolunteer);
   $('btn-volunteer-continue').addEventListener('click', continueToEnding);
 
+  // 续玩卡（v3.6）：三个按钮位置固定，具体语义由 renderResumeCard() 写进 dataset.kind
+  $('btn-resume-run').addEventListener('click', onResumeClick);
+  $('btn-resume-fresh').addEventListener('click', onResumeClick);
+  $('btn-resume-gallery').addEventListener('click', onResumeClick);
+
+  // 结局页「差一点」→ 带着线索开新局
+  $('btn-ending-next').addEventListener('click', openNextRunFromLead);
+
   // 桌面版：接住原生菜单命令
   window.mas2z?.onCommand?.((command) => {
     if (command === 'new-game') backToStart();
@@ -3168,6 +3651,8 @@ async function maybeAutoStart() {
     draft.weeksPerSemester = weeks;
     $('input-weeks').value = String(weeks);
   }
+  // 探针与回归要可复现：?demo=60&seed=probe-1 固定随机流（applyDraftToForm 会写回 #input-seed）
+  if (params.get('seed')) draft.seed = params.get('seed');
   // 跳过志愿填报直接按分数录取：分享"一键看到结局"的链接用（?demo=60&weeks=3&volunteers=0）
   if (params.get('volunteers') === '0') draft.volunteers = false;
   // 上面改的是草稿，startNew 会从表单读一遍，所以要先把草稿写回表单
@@ -3195,6 +3680,18 @@ async function maybeAutoStart() {
 
 async function main() {
   bind();
+  /*
+   * 续玩卡（v3.6）：读 localStorage 是同步的，所以要在首屏最贵的两个 await
+   * （detectApiMode / /api/options）之前先画出来——老玩家打开 App 第一眼
+   * 看到的应该是"上次停在哪儿"，而不是一张空表单。
+   * 同时给回访者把开屏从 1.75s 压到 0.55s（.returning .splash）。
+   */
+  try {
+    document.body.classList.toggle('returning', Boolean(localStorage.getItem(SAVE_KEY)));
+  } catch {
+    /* 存储被禁时保持默认开屏 */
+  }
+  renderResumeCard();
   syncCommunityLinks();
   const mode = await detectApiMode();
   showModeBadge(mode);
@@ -3204,6 +3701,8 @@ async function main() {
     toast(`读取开局选项失败：${error.message}`);
   }
   updateContinueButton();
+  // 选项读回来了：续玩卡再刷一次，把「看看图鉴 12 / 29」那行的数字补上
+  renderResumeCard();
   // 第一次进来先问昵称：它只是本机的一个字符串，没有网络请求，所以同步弹就行
   if (!getNickname()) $('nickname-modal').classList.remove('hidden');
   try {

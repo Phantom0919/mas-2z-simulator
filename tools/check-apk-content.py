@@ -109,6 +109,20 @@ CHECKS = [
     ("assets/www/app.js", "submitCurrentRun", None),
     ("assets/www/style.css", ".board-row", None),
     ("assets/www/content/leaderboard.json", '"table": "leaderboard"', None),
+    # v3.6：考前押卷（新玩法）必须一起进包——数据、引擎、离线接口、界面一个都不能少，
+    # 少任何一个的表现都是"手机上押不了卷"，而这种缺失在浏览器里看不出来
+    ("assets/src/data/exam-bets.js", "FOCUS_HIT_FACTOR", None),
+    ("assets/src/data/exam-bets.js", "betRoll", None),
+    ("assets/src/data/exam-bets.js", "BET_ACHIEVEMENTS", None),
+    ("assets/src/engine.js", "placeExamBet", None),
+    ("assets/src/engine.js", "examBetState", None),
+    ("assets/src/engine.js", "betBackfire", None),
+    ("assets/www/local-api.js", "/api/exam-bet", None),
+    ("assets/www/index.html", 'id="exam-bet-card"', None),
+    ("assets/www/index.html", 'id="exam-bet-options"', None),
+    ("assets/www/app.js", "renderExamBet", None),
+    ("assets/www/app.js", "/api/exam-bet", None),
+    ("assets/www/style.css", ".exam-bet-card", None),
 ]
 
 
