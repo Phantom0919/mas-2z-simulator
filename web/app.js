@@ -474,6 +474,92 @@ function renderItems(view) {
     : '<p class="muted">还没买过东西，去 🛒 商店看看。</p>';
 }
 
+/* ------------------------------------------------------------ 人情账本（v3.7） */
+
+/**
+ * 人情账本：**只读**的侧栏卡片。
+ *
+ * 数据来自 `view.favors`（引擎的 favorState，见 src/engine.js），界面不自己算账期、
+ * 不自己拼"还能拖多久"——`weeksLeft` / `levelLabel` / `pressure` 全是引擎给现成的。
+ * 还 / 拖 / 赖本身在讨债事件弹层里选（走已有的 /api/event），所以这里没有任何按钮与新接口。
+ */
+const FAVOR_ACTION_TEXT = { repay: '✅ 还了', delay: '⏳ 拖了', refuse: '❌ 赖了' };
+const FAVOR_FALLBACK_ACTION = '🕘 处理了';
+
+/** 还有几周的写法：0 表示这周就到，语气最急（样式用 .due-now 标红）。 */
+function favorWhenText(weeksLeft) {
+  return Number(weeksLeft) > 0 ? `还有 ${weeksLeft} 周` : '这周就到';
+}
+
+/** 一行一笔 open 账：欠谁、欠什么、还有几周到期 + 等级角标 + 拖过几次。 */
+function favorRowHtml(favor) {
+  const chips = [`<span class="favor-chip level-${Number(favor.level) || 1}">${escapeHtml(favor.levelLabel)}</span>`];
+  if (Number(favor.delayed) > 0) chips.push(`<span class="favor-chip delayed">拖过 ${favor.delayed} 次</span>`);
+  const title = [favor.what ? `要还：${favor.what}` : '', favor.repayHint ? `还法：${favor.repayHint}` : '']
+    .filter(Boolean)
+    .join('　');
+  // 名字前面带角色（同桌 / 死党 / 数学老师），否则"文博"这种名字玩家对不上人
+  const personText = favor.personRole ? `${favor.personRole} ${favor.personName}` : favor.personName;
+  return `<div class="favor-row${Number(favor.weeksLeft) === 0 ? ' due-now' : ''}" title="${escapeHtml(title)}">
+    <div class="favor-main">
+      <span class="favor-item">${escapeHtml(favor.icon)} ${escapeHtml(favor.title)}</span>
+      <span class="favor-person">${escapeHtml(personText)}</span>
+      <span class="favor-when">${favorWhenText(favor.weeksLeft)}</span>
+    </div>
+    <div class="favor-sub">
+      ${favor.what ? `<span class="favor-what">要还：${escapeHtml(favor.what)}</span>` : ''}
+      ${chips.join('')}
+    </div>
+  </div>`;
+}
+
+/** 历史只留最近三条：`✅ 还了 借来的笔记` / `⏳ 拖了 抄来的作业` / `❌ 赖了 垫上的饭钱`。 */
+function favorHistoryRowHtml(entry) {
+  return `<div class="favor-history-row" title="${escapeHtml(entry.personName ?? '')}">${
+    FAVOR_ACTION_TEXT[entry.action] ?? FAVOR_FALLBACK_ACTION
+  } ${escapeHtml(entry.title)}</div>`;
+}
+
+function renderFavors(view) {
+  const card = $('favor-card');
+  if (!card) return;
+  const favors = view?.favors ?? {};
+  const open = Array.isArray(favors.open) ? favors.open : [];
+  const history = Array.isArray(favors.history) ? favors.history : [];
+  const summary = favors.summary ?? {};
+  const pressure = favors.pressure ?? {};
+
+  // 卡头常驻：空账本时也得让玩家知道"这里有本账"，只是还什么都没记
+  const total = Number(summary.total) || 0;
+  $('favor-head').innerHTML =
+    '<span class="favor-title">🧾 人情账本</span>' +
+    (total > 0
+      ? `<span class="favor-count">欠 ${summary.open ?? open.length} · 还 ${summary.repaid ?? 0} · 赖 ${
+          summary.refused ?? 0
+        }</span>`
+      : '');
+
+  // 压力：欠得太多，每周压心情——数字全部来自引擎的 pressure，界面不重复算
+  const pressureBox = $('favor-pressure');
+  const showPressure = pressure.active === true && Number(pressure.moodPerWeek) > 0;
+  pressureBox.classList.toggle('hidden', !showPressure);
+  pressureBox.textContent = showPressure
+    ? `⚠️ 账本压着 ${pressure.count} 笔人情，每周心情 -${pressure.moodPerWeek}`
+    : '';
+
+  // 空账本：一句陈述就够了（不劝、也不吓——还没到吓人的时候）
+  const empty = $('favor-empty');
+  empty.textContent = open.length ? '' : '还没人帮过你，你也没欠过谁。';
+  empty.classList.toggle('hidden', open.length > 0);
+
+  $('favor-list').innerHTML = open.map(favorRowHtml).join('');
+
+  // 新的在上：账本越读越像账本，不像日志
+  const recent = history.slice(-3).reverse();
+  $('favor-history').innerHTML = recent.map(favorHistoryRowHtml).join('');
+  $('favor-history').classList.toggle('hidden', recent.length === 0);
+}
+
 /* ------------------------------------------------------------ 中栏：行动 */
 
 function actionCard(action) {
@@ -833,6 +919,7 @@ function renderPanels(view) {
   renderBuild(view);
   renderNpc(view);
   renderItems(view);
+  renderFavors(view);
   renderActions(view);
   renderTeaser(view);
   renderExamBet(view);

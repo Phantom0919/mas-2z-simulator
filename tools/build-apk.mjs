@@ -55,6 +55,9 @@ const REQUIRED_MODULES = [
   'src/data/events2.js',
   // 考前押卷（v3.6）：引擎静态 import 它，漏了它网页/APK 都会白屏
   'src/data/exam-bets.js',
+  // 人情账本（v3.7）：数值表 + 12 个事件，同样是引擎静态 import
+  'src/data/favors.js',
+  'src/data/events8.js',
   'src/data/names.js',
   'src/data/cast.js',
   'src/data/story.js',

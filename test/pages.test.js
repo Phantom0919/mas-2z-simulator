@@ -107,7 +107,11 @@ test('几个卖点必须在首屏上方就能看到（不用滚到底才知道�
   assert.match(hero, /立即试玩/);
   assert.match(hero, /下载安卓版/);
   assert.match(hero, /加入腾讯频道/);
-  for (const number of ['37', '95', '36', '29', '79']) {
+  /*
+   * 首屏的数字是"实测值"，不是文案：内容一加就要跟着改，否则页面会一直吹旧数字。
+   * v3.7 复核：行动 37、随机池事件 109（不含剧情与链后续环）、剧情 36 章、结局 29、成就 95。
+   */
+  for (const number of ['37', '109', '36', '29', '95']) {
     assert.ok(hero.includes(number), `首屏的数字里少了 ${number}`);
   }
 });
@@ -265,7 +269,7 @@ test('docs/ 里有 .nojekyll，Pages 才不会拿 Jekyll 去处理这些文件',
 test('页面素材体积在预算内（手机流量党友好）', () => {
   const html = readDocs('index.html');
   const shots = [...new Set([...html.matchAll(/src="\.\/(assets\/shots\/[^"]+)"/g)].map((match) => match[1]))];
-  assert.equal(shots.length, 6, `截图应该有 6 张，实际 ${shots.length} 张`);
+  assert.equal(shots.length, 7, `截图应该有 7 张，实际 ${shots.length} 张`);
 
   let total = 0;
   for (const shot of shots) {
@@ -547,7 +551,7 @@ test('点截图会放大、Esc 会关掉、复制按钮复制的是频道链接'
     await tick();
     await tick();
 
-    assert.equal(browser.shotButtons.length, 6, 'index.html 里的截图数量变了');
+    assert.equal(browser.shotButtons.length, 7, 'index.html 里的截图数量变了');
     const lightbox = browser.byId.get('lightbox');
     assert.equal(lightbox.hidden, true, '放大层初始应该是隐藏的');
 

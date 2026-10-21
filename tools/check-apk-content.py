@@ -123,6 +123,21 @@ CHECKS = [
     ("assets/www/app.js", "renderExamBet", None),
     ("assets/www/app.js", "/api/exam-bet", None),
     ("assets/www/style.css", ".exam-bet-card", None),
+    # v3.7：人情账本（新玩法）——数值表、12 个事件、引擎结算、账本面板，一个都不能少。
+    # 少一个的表现是"手机上欠了人情但账本永远是空的"，浏览器里很不容易发现。
+    ("assets/src/data/favors.js", "FAVOR_MAP", None),
+    ("assets/src/data/favors.js", "favorPressure", None),
+    ("assets/src/data/favors.js", "FAVOR_ACHIEVEMENTS", None),
+    ("assets/src/data/events8.js", "favor_offer_notes", None),
+    ("assets/src/data/events8.js", "favor_collect_notes", None),
+    ("assets/src/data/calendar.js", "favor_offer_notes", None),
+    ("assets/src/engine.js", "favorState", None),
+    ("assets/src/engine.js", "settleFavor", None),
+    ("assets/src/engine.js", "favorBadName", None),
+    ("assets/www/index.html", 'id="favor-card"', None),
+    ("assets/www/index.html", 'id="favor-list"', None),
+    ("assets/www/app.js", "renderFavors", None),
+    ("assets/www/style.css", ".favor-card", None),
 ]
 
 

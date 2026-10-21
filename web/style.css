@@ -3632,6 +3632,175 @@ button,
   color: var(--muted);
 }
 
+/* ------------------------------------------------- 人情账本（v3.7）
+ * 侧栏里的一张只读账本：欠谁、欠什么、还有几周到期、欠太多会压心情。
+ *
+ * 视觉上刻意压一档：中性描边 + 极淡的暖色底，不去抢行动卡的风头；
+ * 只有"这周就到"的账用 --bad 说话。不用 :has()（minSdkVersion 21 的机器
+ * 可能跑着 WebView <105），也不做动画——它是账本，不是弹窗。
+ */
+.favor-card {
+  margin-top: 12px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, rgba(210, 153, 34, 0.07), rgba(210, 153, 34, 0.015));
+}
+
+.favor-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.favor-title {
+  min-width: 0;
+}
+
+/* 有账的时候右边补一句总数；空账本没有这一段 */
+.favor-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.favor-pressure {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 1px solid rgba(210, 153, 34, 0.5);
+  border-radius: 8px;
+  background: rgba(210, 153, 34, 0.1);
+  color: var(--warn);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.favor-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* 一行一笔账：主行（标题 · 谁 · 还有几周）在手机上也读得下，放不下就换行 */
+.favor-row {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  font-size: 12px;
+  line-height: 1.55;
+  min-width: 0;
+}
+
+.favor-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+.favor-item {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.favor-person {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.favor-when {
+  margin-left: auto;
+  color: var(--warn);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 这周就要还：整行标红，拇指滑过去一眼能看见 */
+.favor-row.due-now {
+  border-color: rgba(248, 81, 73, 0.5);
+  background: rgba(248, 81, 73, 0.08);
+}
+
+.favor-row.due-now .favor-when {
+  color: var(--bad);
+  font-weight: 700;
+}
+
+.favor-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 6px;
+  min-width: 0;
+}
+
+.favor-what {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* 等级 / 拖过几次的小角标：和 .chip 同族，但更小、不占行动卡的地方 */
+.favor-chip {
+  display: inline-block;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.favor-chip.level-2 {
+  border-color: rgba(210, 153, 34, 0.5);
+  color: var(--warn);
+}
+
+.favor-chip.level-3 {
+  border-color: rgba(248, 81, 73, 0.5);
+  color: var(--bad);
+}
+
+.favor-chip.delayed {
+  border-color: rgba(188, 140, 255, 0.45);
+  color: var(--purple);
+}
+
+.favor-empty {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.favor-history {
+  display: grid;
+  gap: 2px;
+  margin-top: 9px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.favor-history:empty {
+  display: none;
+}
+
+.favor-history-row {
+  overflow-wrap: anywhere;
+}
+
 /* ---------- 减弱动态效果 ---------- */
 
 /*

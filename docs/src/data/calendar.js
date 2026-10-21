@@ -236,6 +236,24 @@ export const EVENT_SCHEDULE = {
   chain_lake_promise_winter: ANYTIME,
   chain_lake_promise_summer: ANYTIME,
 
+  /* --- 人情账本（events8.js / v3.7） ---
+   * offer 环是随机池里的"别人帮你"，什么时候都可能发生；
+   * collect 环是 chainOnly 的讨债环，到点必弹，但"什么时候到点"由账期决定而不是校历，
+   * 所以同样登记 anytime——这样"每个事件都必须登记"的检查仍然有效。
+   */
+  favor_offer_notes: ANYTIME,
+  favor_collect_notes: ANYTIME,
+  favor_offer_homework: ANYTIME,
+  favor_collect_homework: ANYTIME,
+  favor_offer_meal: ANYTIME,
+  favor_collect_meal: ANYTIME,
+  favor_offer_tutoring: ANYTIME,
+  favor_collect_tutoring: ANYTIME,
+  favor_offer_rival_paper: ANYTIME,
+  favor_collect_rival_paper: ANYTIME,
+  favor_offer_parents_cover: ANYTIME,
+  favor_collect_parents_cover: ANYTIME,
+
   /* --- 什么时候都合理 --- */
   yushanhu_run: ANYTIME,
   canteen_braised: ANYTIME,

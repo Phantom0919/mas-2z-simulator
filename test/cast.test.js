@@ -367,10 +367,18 @@ test('遗忘会被难度放大、被"过目不忘"这类天赋缩小', () => {
   const measure = (difficulty, traits) => {
     const game = createGame({ name: '遗忘', seed: 'decay-scale', difficulty, traits, weeksPerSemester: 6 });
     const before = { ...game.knowledge };
-    performAction(game, 'sleep');
-    settle(game);
-    performAction(game, 'sleep');
-    settle(game);
+    /*
+     * 量"纯遗忘"：用 canteen（食堂加餐）当基准行动——它**没有任何知识效果**，
+     * 所以两周下来测到的差额就是遗忘本身。
+     *
+     * 以前这里是 performAction('sleep') + settle()，靠 settle 把事件顺带加的知识还原掉；
+     * 但内容一多，事件顺序一变还原就未必严丝合缝——v3.7 加了 12 个人情事件之后
+     * 这条测试开始假红（"困难应该比正常忘得多"翻不过去）。而且 sleep 自己给 +0.2/科，
+     * 跟遗忘是一个量级，换难度时噪声会盖过信号。
+     * 它测的是难度/天赋对遗忘的放大，不该受"这一局弹了哪个事件、这周做了什么"影响，
+     * 所以用中性的行动 + skipEvents 把两个变量一起拿掉。
+     */
+    for (let i = 0; i < 2; i += 1) playWeek(game, () => ({ actionId: 'canteen' }), { skipEvents: true });
     const losses = Object.keys(before).map((key) => before[key] - (game.knowledge[key] ?? 0));
     return losses.reduce((sum, value) => sum + value, 0) / losses.length;
   };

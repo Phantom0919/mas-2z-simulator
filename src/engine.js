@@ -68,6 +68,18 @@ import { ABSTRACT_EVENTS } from './data/events4.js';
 import { CAMPUS_ACHIEVEMENTS, CAMPUS_EVENTS } from './data/events5.js';
 import { CHAIN_ACHIEVEMENTS, CHAIN_EVENTS } from './data/events6.js';
 import { DAILY_ACHIEVEMENTS, DAILY_EVENTS } from './data/events7.js';
+import { FAVOR_EVENTS } from './data/events8.js';
+import {
+  FAVOR_ACHIEVEMENTS,
+  FAVOR_ACTIONS,
+  FAVOR_BAD_NAME_AT,
+  FAVOR_BY_COLLECT,
+  FAVOR_MAP,
+  delayFavor,
+  favorOf,
+  favorPressure,
+  weeksLeftOf,
+} from './data/favors.js';
 import { nextWeekTeaser } from './data/teasers.js';
 import {
   BET_ACHIEVEMENTS,
@@ -121,7 +133,7 @@ import {
 /** 存档格式版本（结构变了才动它）。 */
 export const VERSION = 2;
 /** 游戏版本。内容包的 `requires.app` 拿它做兼容判断；和 package.json 必须一致（有测试盯着）。 */
-export const GAME_VERSION = '3.6.0';
+export const GAME_VERSION = '3.7.0';
 
 /* ------------------------------------------------------- 内容（可热更新） */
 
@@ -142,6 +154,8 @@ const BASELINE = {
     ...DAILY_EVENTS,
     // 因果链事件：第一环从随机池进来，后面几环带 chainOnly，只能被"链"出来
     ...CHAIN_EVENTS,
+    // 人情账本（v3.7）：借人情的 offer 环进随机池，讨债环只能被链出来（chainOnly）
+    ...FAVOR_EVENTS,
     // 剧情事件也并进事件表，但带 story: true，不会进随机池
     ...storyEvents(),
   ],
@@ -1387,6 +1401,9 @@ export function createGame(options = {}) {
     /** 考前押卷（v3.6）：这一场押了什么 + 这一局押过的每一场。 */
     examBet: freshExamBet(),
     examBets: [],
+    /** 人情账本（v3.7）：欠着的人情（open / repaid / refused）+ 处理记录。 */
+    favors: [],
+    favorLog: [],
     /** 玩法：'solo' | 'versus'（见 MODES）。 */
     mode,
     /** AI 对战的对手（单人模式是 null）。 */
@@ -2123,6 +2140,186 @@ function endPhase(game, result) {
   advanceRivalPhase(game, phase);
 }
 
+/* ------------------------------------------------------- 人情账本（v3.7） */
+
+/**
+ * 欠下一笔人情。
+ *
+ * 三件事必须一起发生，否则机制就是假的：
+ *   1. 记进账本（谁、多重、什么时候到期）；
+ *   2. **排一条到点必弹的因果链**（`chainOnly` 事件，概率挤不掉）——这是"世界记得"的兑现；
+ *   3. 当场的好处由内容事件自己给（`stats` / `knowledge` / `money`），这里不重复给。
+ */
+function openFavor(game, spec) {
+  const meta = favorOf(spec?.kind);
+  if (!meta) return null;
+  game.favors ??= [];
+  const level = clamp(Math.round(Number(spec?.level ?? meta.level) || meta.level), 1, 3);
+  const favor = {
+    id: `${meta.id}_${game.turn}_${game.favors.length}`,
+    kind: meta.id,
+    person: meta.npc,
+    level,
+    fromTurn: game.turn,
+    dueTurn: game.turn + meta.delay,
+    status: 'open',
+  };
+  game.favors.push(favor);
+  armChain(game, { id: meta.collectEvent, delay: meta.delay });
+  if (game.favors.filter((entry) => entry.status === 'open').length >= 4) game.flags.favorBigDebt = true;
+  return favor;
+}
+
+/** 这笔人情还在账上吗（讨债环到点时要认人）。 */
+function openFavorOfKind(game, kind) {
+  return (game.favors ?? []).find((entry) => entry.kind === kind && entry.status === 'open') ?? null;
+}
+
+/**
+ * 处理一笔人情：还 / 拖 / 赖。
+ *
+ * 三条路的后果全部来自 `src/data/favors.js` 的表（内容作者改表不改引擎）：
+ *   repay  —— 记成"还清"；第一次还就解锁成就 flag，还够四笔再进一步；
+ *   delay  —— 账**不消失**，升一级、期限缩短、重新排链（利息）；
+ *   refuse —— 记成"赖掉"；赖够两条就 `favorBadName`（后面没人愿意再帮你）。
+ */
+function settleFavor(game, favorId, action, api) {
+  if (!FAVOR_ACTIONS.includes(action)) return null;
+  const favor = (game.favors ?? []).find((entry) => entry.id === favorId) ?? null;
+  if (!favor || favor.status !== 'open') return null;
+  const meta = favorOf(favor.kind);
+  const rule = meta?.actions?.[action];
+  if (!meta || !rule) return null;
+
+  // 后果本身是普通 effect（stats / npc / money / flags），交给同一个解释器，
+  // 这样道具、天赋、难度对"还债代价"的修正和别处一致。
+  applyEffects(game, rule, api);
+
+  const personName = personLabel(game, favor.person);
+  if (action === 'repay') {
+    favor.status = 'repaid';
+    favor.settledTurn = game.turn;
+    game.flags.favorRepaidOnce = true;
+    const repaid = (game.favors ?? []).filter((entry) => entry.status === 'repaid').length;
+    if (repaid >= 4) game.flags.favorRepaidMany = true;
+  } else if (action === 'delay') {
+    const next = delayFavor(favor) ?? { level: 2, delay: 3 };
+    favor.level = next.level;
+    favor.dueTurn = game.turn + next.delay;
+    favor.delayed = (favor.delayed ?? 0) + 1;
+    armChain(game, { id: meta.collectEvent, delay: next.delay });
+  } else {
+    favor.status = 'refused';
+    favor.settledTurn = game.turn;
+    game.flags.favorRefusedOnce = true;
+    const refused = (game.favors ?? []).filter((entry) => entry.status === 'refused').length;
+    if (refused >= FAVOR_BAD_NAME_AT) game.flags.favorBadName = true;
+  }
+
+  game.favorLog ??= [];
+  game.favorLog.push({
+    kind: favor.kind,
+    icon: meta.icon,
+    title: meta.title,
+    personName,
+    action,
+    atTurn: game.turn,
+  });
+  if (game.favorLog.length > 24) game.favorLog.splice(0, game.favorLog.length - 24);
+  return { favor, meta, action };
+}
+
+/** 账本对每周的"压力"：欠太多会一直压着心情（这是账本唯一的数值约束）。 */
+function applyFavorPressure(game, lines) {
+  const open = (game.favors ?? []).filter((entry) => entry.status === 'open').length;
+  const pressure = favorPressure(open);
+  if (pressure.moodPerWeek > 0) {
+    game.stats.mood -= pressure.moodPerWeek;
+    lines?.push(`🧾 账本上还压着 ${open} 笔人情（心情 -${round1(pressure.moodPerWeek)}/周）。`);
+  }
+}
+
+/** 读档清洗：手改过的存档不能把奇怪的账带进引擎。 */
+function sanitizeFavors(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((entry) => entry && typeof entry === 'object' && FAVOR_MAP[entry.kind])
+    .slice(-12)
+    .map((entry, index) => ({
+      id: typeof entry.id === 'string' ? entry.id : `${entry.kind}_${index}`,
+      kind: entry.kind,
+      person: FAVOR_MAP[entry.kind].npc,
+      level: clamp(Math.round(Number(entry.level) || 1), 1, 3),
+      fromTurn: Number.isFinite(entry.fromTurn) ? entry.fromTurn : 0,
+      dueTurn: Number.isFinite(entry.dueTurn) ? entry.dueTurn : 0,
+      status: ['open', 'repaid', 'refused'].includes(entry.status) ? entry.status : 'open',
+      delayed: clamp(Number(entry.delayed) || 0, 0, 9),
+    }));
+}
+
+function sanitizeFavorLog(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((entry) => entry && FAVOR_MAP[entry.kind])
+    .slice(-24)
+    .map((entry) => ({
+      kind: entry.kind,
+      icon: FAVOR_MAP[entry.kind].icon,
+      title: FAVOR_MAP[entry.kind].title,
+      personName: String(entry.personName ?? ''),
+      action: FAVOR_ACTIONS.includes(entry.action) ? entry.action : 'repay',
+      atTurn: Number.isFinite(entry.atTurn) ? entry.atTurn : 0,
+    }));
+}
+
+/**
+ * 给界面看的人情账本（纯读）。
+ * 前端不需要新接口：账本就在每周的 view 里，还款/赖账本身走事件弹层（选项 effect）。
+ */
+export function favorState(game) {
+  const favors = Array.isArray(game?.favors) ? game.favors : [];
+  const open = favors
+    .filter((entry) => entry.status === 'open')
+    .map((entry) => {
+      const meta = favorOf(entry.kind);
+      const actions = meta?.actions ?? {};
+      /*
+       * 账本上写"谁欠你/你欠谁"时，光有名字（文博）玩家未必对得上人，
+       * 所以再给一个角色前缀（同桌 / 死党 / 数学老师 / 老对手）。
+       * 爸妈没有 cast 角色位，personLabel 已经直接给"爸爸妈妈"，这里就留空。
+       */
+      const personRole = entry.person === 'parents' ? '' : (game?.cast?.map?.[entry.person]?.role ?? '');
+      return {
+        id: entry.id,
+        kind: entry.kind,
+        icon: meta?.icon ?? '🧾',
+        title: meta?.title ?? entry.kind,
+        person: entry.person,
+        personName: personLabel(game, entry.person),
+        personRole,
+        what: meta?.owe ?? '',
+        dueTurn: entry.dueTurn,
+        weeksLeft: weeksLeftOf(entry, game.turn),
+        level: entry.level,
+        levelLabel: ['', '轻', '重', '更重'][entry.level] ?? '重',
+        delayed: entry.delayed ?? 0,
+        repayLabel: actions.repay?.label ?? '还上',
+        repayHint: actions.repay?.hint ?? '',
+        delayHint: actions.delay?.hint ?? '',
+        refuseHint: actions.refuse?.hint ?? '',
+      };
+    });
+  const pressure = favorPressure(open.length);
+  const count = (status) => favors.filter((entry) => entry.status === status).length;
+  return {
+    open,
+    summary: { open: open.length, repaid: count('repaid'), refused: count('refused'), total: favors.length },
+    /** 欠得太多会压着心情：`active` 为 true 时每周扣 `moodPerWeek`。 */
+    pressure: { ...pressure, active: pressure.moodPerWeek > 0 },
+    history: (game?.favorLog ?? []).slice(-6).map((entry) => ({ ...entry })),
+  };
+}
+
 /* --------------------------------------------------------------- 事件 */
 
 function rollEvent(game, weekend) {
@@ -2137,8 +2334,18 @@ function rollEvent(game, weekend) {
    * 这条要排在概率判定之前——链是承诺过的后果，不能因为运气不出。
    */
   if (Array.isArray(game.chains) && game.chains.length > 0) {
-    // 内容包被撤掉之后，指向不存在事件的链要丢掉，不能一直堵在队列里
-    game.chains = game.chains.filter((entry) => EVENT_MAP[entry?.id]);
+    /*
+     * 内容包被撤掉之后，指向不存在事件的链要丢掉，不能一直堵在队列里。
+     * 人情账本（v3.7）同理：账已经还清/赖掉的讨债链要是还排在队里，
+     * 会出现"来讨一笔已经不在账上的人情"——那种事件一旦弹出来，玩家只会觉得游戏记错了。
+     */
+    game.chains = game.chains.filter((entry) => {
+      const event = EVENT_MAP[entry?.id];
+      if (!event) return false;
+      const favorKind = FAVOR_BY_COLLECT[entry.id];
+      if (favorKind && !openFavorOfKind(game, favorKind.id)) return false;
+      return true;
+    });
     const index = game.chains.findIndex((entry) => (entry?.atTurn ?? 0) <= game.turn);
     if (index >= 0) {
       const [entry] = game.chains.splice(index, 1);
@@ -2198,6 +2405,13 @@ function triggerEvent(game, event, lines) {
   if (event.kind === 'choice') {
     applyEffects(game, event.effect, api);
     clampAndWarn(game, lines);
+    /*
+     * 人情账本（v3.7）：讨债环到点时要认人。
+     * 把"这是哪一笔账"钉在待处理事件上，`resolveEvent` 里那个
+     * `favor: { resolve }` 才知道要结算哪一条（同 kind 可能欠过好几笔）。
+     */
+    const favorKind = FAVOR_BY_COLLECT[event.id];
+    const favor = favorKind ? openFavorOfKind(game, favorKind.id) : null;
     game.pendingEvent = {
       id: event.id,
       name: event.name,
@@ -2205,6 +2419,7 @@ function triggerEvent(game, event, lines) {
       story: Boolean(event.story),
       arcTitle: event.storyArcTitle ?? null,
       text: eventText,
+      favorId: favor?.id ?? null,
       choices: (event.choices ?? []).map((choice) => ({
         id: choice.id,
         label: resolveText(choice.label, game),
@@ -2562,6 +2777,13 @@ function finish(game, endingId, extra = {}) {
   // 先到先得：一件事已经把这一局结束了（比如路边摊直接吃进医院），
   // 后面紧接着的 checkCollapse 不许再改结局。
   if (game.status === 'ended' && game.ending) return game.ending;
+
+  /*
+   * 人情账本（v3.7）：「万事不求人」这条路要留痕——
+   * 一局下来一条人情都没欠过，才配拿这个成就。写在结算之前，
+   * 因为 collectAchievements 只看 flag。
+   */
+  if (!(game.favors ?? []).length) game.flags.favorClean = true;
 
   const base = ENDINGS[endingId] ?? ENDINGS.graduated;
   const ending = { ...base, ...extra };
@@ -3089,6 +3311,10 @@ function collectAchievements(game) {
   for (const item of DAILY_ACHIEVEMENTS) {
     if (game.flags[item.flag]) add(item.icon, item.name, item.desc);
   }
+  // 人情账本自带的成就（src/data/favors.js 声明，按 flag 捡）
+  for (const item of FAVOR_ACHIEVEMENTS) {
+    if (game.flags[item.flag]) add(item.icon, item.name, item.desc);
+  }
   return list;
 }
 
@@ -3177,6 +3403,8 @@ export function runSummary(game) {
      * 所以摘要里带上押了几场、中了几场（分数本身不变，分数就是分数）。
      */
     bets: view.examBet.summary,
+    /** v3.7 人情账本：这一局欠了几笔、还了几笔、赖了几笔（榜单/图鉴口径）。 */
+    favors: view.favors.summary,
   };
 }
 
@@ -3265,6 +3493,9 @@ export function deserialize(input) {
   // 考前押卷（v3.6）：老存档没有这两个字段，补成"这一场还没押过"
   data.examBet = sanitizeExamBet(data.examBet, data.subjectKeys);
   data.examBets = sanitizeExamBets(data.examBets);
+  // 人情账本（v3.7）：老存档没有这两个字段，补成"账本是空的"
+  data.favors = sanitizeFavors(data.favors);
+  data.favorLog = sanitizeFavorLog(data.favorLog);
   data.flags ??= {};
   data.cooldowns ??= {};
   data.log ??= [];
@@ -3428,6 +3659,11 @@ export function viewState(game) {
      */
     examBet: examBetState(game),
     /**
+     * 人情账本（v3.7）：欠着哪些人的什么、还有几周到期、欠太多时的每周心情压力。
+     * 还款 / 拖延 / 赖账本身走事件弹层（选项 effect 带 `favor.resolve`），所以不需要新接口。
+     */
+    favors: favorState(game),
+    /**
      * 下回预告（v3.4）：每周结算给一句"往前看"的钩子，不改变任何数值。
      * 只吃一个快照，方便单独测（见 src/data/teasers.js）。
      */
@@ -3581,13 +3817,32 @@ function applyEffects(game, effect, api) {
   const spec = typeof effect === 'function' ? effect(game) : effect;
   if (!spec) return;
   if (spec.text) api.say(spec.text);
-  const { stats = {}, npc = {}, knowledge, money = 0, flags = {}, risk, ending, endingExtra, chain, graduationEnding, graduationExtra } = spec;
+  const { stats = {}, npc = {}, knowledge, money = 0, flags = {}, risk, ending, endingExtra, chain, graduationEnding, graduationExtra, favor } = spec;
   for (const [key, value] of Object.entries(stats)) api.addStat(key, value);
   for (const [key, value] of Object.entries(npc)) api.addNpc(key, value);
   if (knowledge) api.addKnowledge(knowledge);
   if (money) api.addMoney(money);
   for (const [key, value] of Object.entries(flags)) game.flags[key] = value;
   if (chain) armChain(game, chain);
+  /*
+   * 人情账本（v3.7）：
+   *   `favor: { kind }`       —— 借下这笔人情（内容事件里的"接受帮忙"那个选项）；
+   *   `favor: { resolve }`    —— 还 / 拖 / 赖（讨债环的三个选项），账本 id 从当前待处理事件上取。
+   * 数值不写在事件里：全部来自 src/data/favors.js 的表，内容作者改文案不改平衡。
+   */
+  if (favor) {
+    if (favor.kind) {
+      const opened = openFavor(game, favor);
+      if (opened) {
+        const meta = favorOf(opened.kind);
+        api.say(`🧾 账本上多了一笔：${meta.title}（${weeksLeftOf(opened, game.turn)} 周内要还）。`);
+      }
+    } else if (favor.resolve) {
+      const favorId = favor.id ?? game.pendingEvent?.favorId ?? null;
+      const settled = settleFavor(game, favorId, favor.resolve, api);
+      if (!settled) api.say('这笔人情已经不在账上了。');
+    }
+  }
   /*
    * 「毕业去向」：这次选择决定了你三年之后会走上哪条路，但**不当场结束这一局**。
    *
@@ -3822,6 +4077,9 @@ function applyWeeklyUpkeep(game, lines) {
   if (game.flags.artTrack) game.stats.comprehensive += 0.6;
   if (game.flags.sportsTeam) game.stats.physique += 0.8;
 
+  // 人情账本（v3.7）：欠太多会一直压着心情——这是"账"对玩法的约束，不是装饰
+  applyFavorPressure(game, lines);
+
   // 不进则退：没碰过的科目这周就白丢了
   const decay = applyKnowledgeDecay(game);
   if (decay.total >= 0.3) {
@@ -3934,6 +4192,7 @@ export {
   collegeTierFor,
   examPlan,
   advanceStory,
+  collectAchievements,
   rankFromScore,
   randomStudentName,
   relationGraph,

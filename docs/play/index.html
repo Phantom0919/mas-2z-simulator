@@ -109,6 +109,19 @@
         <div id="npc"></div>
         <h2>我的物品</h2>
         <div id="items"></div>
+        <!--
+          人情账本（v3.7）：别人帮你会欠下一笔人情，几周后对方会来讨（还 / 拖 / 赖在事件弹层里选）。
+          这张卡是**只读**的，作用是提前看见"欠谁、欠什么、还有几周到期、欠太多会压心情"，
+          所以不绑任何按钮、也不走新接口。六个 id 必须静态写在这里（守门测试盯着），
+          内容由 renderFavors() 填。
+        -->
+        <div class="favor-card" id="favor-card">
+          <div class="favor-head" id="favor-head"></div>
+          <div class="favor-pressure hidden" id="favor-pressure"></div>
+          <div class="favor-list" id="favor-list"></div>
+          <p class="favor-empty" id="favor-empty"></p>
+          <div class="favor-history" id="favor-history"></div>
+        </div>
       </section>
 
       <section class="panel panel-actions">

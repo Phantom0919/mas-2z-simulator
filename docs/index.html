@@ -21,7 +21,7 @@
     <meta property="og:title" content="中二野人实验室 · 三年 · 六个学期 · 72 次抉择" />
     <meta
       property="og:description"
-      content="一所虚构高中的三年：捏人开局的自由度、37 种行动、95 个随机事件、29 个结局，高考之后还要自己填六个志愿。点开就能玩。"
+      content="一所虚构高中的三年：捏人开局的自由度、37 种行动、109 个随机事件、29 个结局，高考之后还要自己填六个志愿。点开就能玩。"
     />
     <meta property="og:image" content="./assets/og.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -69,7 +69,7 @@
         <div class="hero-glow" aria-hidden="true"></div>
         <div class="wrap hero-inner">
           <p class="badge-row">
-            <span class="badge" data-version-badge>v3.6.0</span>
+            <span class="badge" data-version-badge>v3.7.0</span>
             <span class="badge">安卓 APK / 网页</span>
             <span class="badge">免费 · 无广告 · 无内购</span>
             <span class="badge">不联网也能玩</span>
@@ -82,6 +82,7 @@
             你是二中（<em>虚构校名</em>）的高一新生。每个星期两个决定：主行动做什么、周末怎么安排。
             没碰过的科目每周都在遗忘，熬夜刷题经常是负收益，几周前的选择会在期末回来找你。<br />
             十二场考试，进考场前<strong>还可以赌一把</strong>：把范围砍到七成去押重点，还是花一周赌出题方向。
+            别人帮你的<strong>会记在账本上</strong>——借来的笔记、抄来的作业、老师单独讲的那节课，几个月后都要还。
             高考出分也不是终点，<strong>最后一关是六个志愿怎么填</strong>。
           </p>
 
@@ -103,11 +104,11 @@
 
           <dl class="hero-stats">
             <div><dt>行动</dt><dd>37</dd></div>
-            <div><dt>随机事件</dt><dd>95</dd></div>
+            <div><dt>随机事件</dt><dd>109</dd></div>
             <div><dt>剧情章节</dt><dd>36</dd></div>
             <div><dt>结局图鉴</dt><dd>29</dd></div>
-            <div><dt>成就</dt><dd>79</dd></div>
-            <div><dt>自动化测试</dt><dd>300+</dd></div>
+            <div><dt>成就</dt><dd>95</dd></div>
+            <div><dt>自动化测试</dt><dd>460+</dd></div>
           </dl>
         </div>
       </section>
@@ -179,7 +180,7 @@
               <p class="card-icon" aria-hidden="true">📖</p>
               <h3>多周目收集</h3>
               <p>
-                29 个结局、79 个成就、7 条剧情线 36 章、结局图鉴、跨局传承点（每玩满 2 局多得 1 点属性点）。
+                29 个结局、95 个成就、7 条剧情线 36 章、结局图鉴、跨局传承点（每玩满 2 局多得 1 点属性点）。
                 还有自由模式：什么时候高考由你自己决定。
               </p>
             </article>
@@ -213,6 +214,13 @@
                 <img src="./assets/shots/ending.jpg" alt="结局结算页面：结局标题、成就清单、上一次同难度的对比与「差一点」提示" loading="lazy" width="900" height="633" />
               </button>
               <figcaption><strong>结局不是终点</strong>结局、成就、同难度的自我对比，还有"再凑一个就能碰到"的那句提示，都在这一页收口。</figcaption>
+            </figure>
+
+            <figure class="shot shot-tall">
+              <button type="button" class="shot-btn" data-full="./assets/shots/v37-favor.jpg" data-title="人情账本：欠谁什么、还有几周">
+                <img src="./assets/shots/v37-favor.jpg" alt="侧栏的人情账本：三笔欠着的人情、到期周数、等级角标与压力警告，下面是还/拖/赖的历史" loading="lazy" width="500" height="900" />
+              </button>
+              <figcaption><strong>人情账本</strong>欠谁什么、还有几周到期、拖过几次，全写在侧栏；欠到第三笔就开始压心情。</figcaption>
             </figure>
 
             <figure class="shot shot-tall">
@@ -258,7 +266,7 @@
               <h3>🤖 安卓版 APK</h3>
               <p class="plan-desc">
                 约 <span data-apk-size>0.5 MB</span>，不用装任何框架。装的时候系统会提示「未知来源应用」——因为它是个人项目、
-                没有上架商店。版本 <span data-apk-version>v3.6.0</span>。
+                没有上架商店。版本 <span data-apk-version>v3.7.0</span>。
               </p>
               <p class="plan-actions">
                 <a class="btn btn-primary" href="./download/中二野人实验室-安卓版.apk" download>⬇ 下载 APK</a>
@@ -283,6 +291,23 @@
           <p class="section-sub">每个版本都做完整回归测试后才发；发版之后还能靠内容包继续加东西。</p>
 
           <ol class="timeline">
+            <li>
+              <span class="tl-ver">v3.7</span>
+              <div class="tl-body">
+                <h3>人情账本：别人帮你的，几个月后要来还</h3>
+                <p>
+                  以前好感度只涨不减，像背景音。现在<strong>别人帮你会记账</strong>：借同桌的笔记、抄死党的作业、
+                  让老师单独讲一节课、爸妈替你去开考砸的家长会——当场都是好处，但账期一到对方会来讨，
+                  <strong>到点必弹、躲不掉</strong>。你可以还（花时间/钱/疲劳）、拖（账升一级、期限缩短、重新排链）、
+                  赖（关系崩掉；赖满两条，在班里就没信用了）。同时欠到第 3 笔起，<strong>账本会压着你的心情</strong>——
+                  这是它逼你做取舍的地方。
+                </p>
+                <p>
+                  6 组人情 / 12 个事件：同桌的安静、死党的江湖气、老师的分寸、老对手绷着的骄傲、爸妈压着的关心
+                  各有各的语气；拖过一次再来讨时，语气会变冷。侧栏的「🧾 人情账本」随时告诉你欠谁什么、还有几周。
+                </p>
+              </div>
+            </li>
             <li>
               <span class="tl-ver">v3.6</span>
               <div class="tl-body">
@@ -426,7 +451,7 @@
               <span class="tl-ver">v2.x</span>
               <div class="tl-body">
                 <h3>基础系统</h3>
-                <p>3+1+2 选科、11 种天赋、4 种家庭背景、9 个高考目标、37 种行动、95 个随机事件、7 条剧情线 36 章、29 个结局、79 个成就。</p>
+                <p>3+1+2 选科、11 种天赋、4 种家庭背景、9 个高考目标、37 种行动、109 个随机事件、7 条剧情线 36 章、29 个结局、95 个成就。</p>
               </div>
             </li>
           </ol>
@@ -598,7 +623,7 @@
               </p>
               <p>
                 整个游戏只有一份纯逻辑引擎，被网页版与安卓 APK 两端共用；
-                目前有 400 多条自动化测试盯着这条链路（包括解包 APK、把里面的引擎拿出来真打一局）。
+                目前有 460 多条自动化测试盯着这条链路（包括解包 APK、把里面的引擎拿出来真打一局）。
                 桌面客户端已经下线——维护成本不划算，而零依赖的代码本来就能在浏览器里跑。
               </p>
               <ul class="about-list">
@@ -632,7 +657,7 @@
           <div>
             <p class="footer-title">中二野人实验室</p>
             <p class="footer-sub">
-              <span data-version-badge>v3.6.0</span> · 厚德 · 励学 · 敦行
+              <span data-version-badge>v3.7.0</span> · 厚德 · 励学 · 敦行
             </p>
           </div>
         </div>
